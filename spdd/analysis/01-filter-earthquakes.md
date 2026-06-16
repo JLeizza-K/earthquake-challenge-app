@@ -35,12 +35,12 @@
 
 ## Validation rules (from ACs)
 
-| Field | Rule | Error trigger |
-|---|---|---|
-| `starttime` | Required, valid date, not in the future | Empty, non-date input, or future date (AC2, AC6) |
-| `endtime` | Required, valid date, not in the future | Empty, non-date input, or future date (AC2, AC6) |
-| `starttime` vs `endtime` | `starttime` must be ≤ `endtime` | Start after end (AC1) |
-| `minMagnitude` | Required, numeric, range 0–10 | Empty, non-numeric, or out of range (AC2, AC6) |
+| Field                    | Rule                                    | Error trigger                                    |
+| ------------------------ | --------------------------------------- | ------------------------------------------------ |
+| `starttime`              | Required, valid date, not in the future | Empty, non-date input, or future date (AC2, AC6) |
+| `endtime`                | Required, valid date, not in the future | Empty, non-date input, or future date (AC2, AC6) |
+| `starttime` vs `endtime` | `starttime` must be ≤ `endtime`         | Start after end (AC1)                            |
+| `minMagnitude`           | Required, numeric, range 0–10           | Empty, non-numeric, or out of range (AC2, AC6)   |
 
 Validation is purely synchronous — no async call. All errors are field-level (shown inline next to the field, not as a banner). On validation failure: no fetch is fired (AC1, AC2, AC6).
 
@@ -83,15 +83,15 @@ Single `status` field drives all UI branches. No parallel boolean flags (`isLoad
 
 ## Automatic retry policy
 
-| Property | Value |
-|---|---|
-| Total attempts | 3 (1 initial + 2 automatic retries, no user intervention between them) |
-| Retryable errors | Network failures, timeouts, HTTP 5xx, HTTP 429 (rate limit) |
-| Non-retryable errors | HTTP 4xx except 429 (e.g. 400 for invalid/too-large range) → go straight to error |
-| Backoff | 1s before retry 1, 2s before retry 2 |
-| Per-attempt timeout | Each attempt has its own timeout (suggested 10s — exact value set in Canvas). A timeout counts as a retryable error. |
+| Property                  | Value                                                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Total attempts            | 3 (1 initial + 2 automatic retries, no user intervention between them)                                                                                                     |
+| Retryable errors          | Network failures, timeouts, HTTP 5xx, HTTP 429 (rate limit)                                                                                                                |
+| Non-retryable errors      | HTTP 4xx except 429 (e.g. 400 for invalid/too-large range) → go straight to error                                                                                          |
+| Backoff                   | 1s before retry 1, 2s before retry 2                                                                                                                                       |
+| Per-attempt timeout       | Each attempt has its own timeout (suggested 10s — exact value set in Canvas). A timeout counts as a retryable error.                                                       |
 | After all 3 attempts fail | Enter `error` state. Restore the form with the original `FilterCriteria`. Show attention-grabbing message at top of the filter panel: "Please try again in a few minutes." |
-| `attemptCount` | Exposed alongside `status` (values 1–3) so the UI can show "Retrying (1/2)…" / "Retrying (2/2)…" during automatic retries. |
+| `attemptCount`            | Exposed alongside `status` (values 1–3) so the UI can show "Retrying (1/2)…" / "Retrying (2/2)…" during automatic retries.                                                 |
 
 Manual resubmit (AC5) remains available from the `error` state — the user can submit again at any time.
 
@@ -99,14 +99,14 @@ Manual resubmit (AC5) remains available from the `error` state — the user can 
 
 ## UI state display
 
-| Status | Behaviour |
-|---|---|
-| `idle` | Form enabled, no banner |
-| `loading` (`attemptCount` = 1) | Semi-transparent grey overlay covers the filter panel; "Loading…" label centered; form disabled |
-| `loading` (`attemptCount` > 1) | Same overlay; label shows "Retrying (1/2)…" or "Retrying (2/2)…" |
-| `empty` | Attention-grabbing message at the **top** of the filter panel: "No earthquakes found" |
-| `error` | Attention-grabbing message at the **top** of the filter panel with error detail + retry button (AC5) |
-| `success` | No banner; points visible on map |
+| Status                         | Behaviour                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `idle`                         | Form enabled, no banner                                                                              |
+| `loading` (`attemptCount` = 1) | Semi-transparent grey overlay covers the filter panel; "Loading…" label centered; form disabled      |
+| `loading` (`attemptCount` > 1) | Same overlay; label shows "Retrying (1/2)…" or "Retrying (2/2)…"                                     |
+| `empty`                        | Attention-grabbing message at the **top** of the filter panel: "No earthquakes found"                |
+| `error`                        | Attention-grabbing message at the **top** of the filter panel with error detail + retry button (AC5) |
+| `success`                      | No banner; points visible on map                                                                     |
 
 ---
 
@@ -127,14 +127,14 @@ Null-data rules:
 
 ## Risks & edge cases
 
-| Risk | Mitigation |
-|---|---|
-| Large date range → HTTP 400 | Non-retryable — straight to error state, no retries |
-| Rapid resubmits (race condition) | `requestId` counter; discard stale responses |
-| Features with missing geometry | Dropped by `toEarthquakes`; counted in `skippedCount` |
-| Features with null mag | Kept as-is; uniform size in Story 1 means no rendering impact |
-| Zero features is a valid success (not an error) | `empty` is a distinct status from `error` (AC4) |
-| Network failure / HTTP 429 / HTTP 5xx | Retryable — see Automatic retry policy |
-| Per-attempt timeout | Treated as retryable error — see Automatic retry policy |
+| Risk                                                  | Mitigation                                                                                                                                                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Large date range → HTTP 400                           | Non-retryable — straight to error state, no retries                                                                                                                                                        |
+| Rapid resubmits (race condition)                      | `requestId` counter; discard stale responses                                                                                                                                                               |
+| Features with missing geometry                        | Dropped by `toEarthquakes`; counted in `skippedCount`                                                                                                                                                      |
+| Features with null mag                                | Kept as-is; uniform size in Story 1 means no rendering impact                                                                                                                                              |
+| Zero features is a valid success (not an error)       | `empty` is a distinct status from `error` (AC4)                                                                                                                                                            |
+| Network failure / HTTP 429 / HTTP 5xx                 | Retryable — see Automatic retry policy                                                                                                                                                                     |
+| Per-attempt timeout                                   | Treated as retryable error — see Automatic retry policy                                                                                                                                                    |
 | Response resolves before the map's `load` event fires | Guard before `setData`: verify the map is loaded and the `'earthquakes'` source exists; otherwise the call crashes. (Lower-probability now that there is no auto-fetch on mount, but kept as a safeguard.) |
-| USGS CORS policy | USGS API allows cross-origin requests — no proxy needed |
+| USGS CORS policy                                      | USGS API allows cross-origin requests — no proxy needed                                                                                                                                                    |

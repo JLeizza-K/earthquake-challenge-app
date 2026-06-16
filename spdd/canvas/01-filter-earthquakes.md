@@ -55,8 +55,11 @@ QueryResult {
 FetchState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
 ```
 
-`attemptCount: number` (1–3) is carried alongside `FetchState` inside `useEarthquakeQuery`
-to distinguish first load from retries in the UI — it is not a separate state.
+Retries are handled internally inside `api.js` and are not exposed to the UI. The hook does not track or expose `attemptCount`.
+
+`CountResult: number` — the integer returned by the USGS `/count` endpoint.
+
+`TOO_MANY_RESULTS` — a typed error marker created when the count exceeds 20 000. Allows `useEarthquakeQuery` to branch on this specific case and `toUserMessage` to produce the distinct "too broad" copy, separate from generic API failures.
 
 ---
 
@@ -80,6 +83,14 @@ supported by MapLibre; we simply use a constant value now).
 **Automatic retry for transient errors.** 3 total attempts, 1s/2s backoff, retryable on
 network failure / timeout / HTTP 5xx / HTTP 429. Non-retryable on HTTP 4xx ≠ 429 (e.g.
 a 400 from an invalid or too-large date range goes straight to error with no retries).
+Retries are transparent to the user: while retrying the app stays in `'loading'` with a
+single "Loading…" message; the retry count is not surfaced.
+
+**Count-first:** before fetching results, every submit calls the USGS `count` endpoint (same params, `/count` instead of `/query`) to learn the match count cheaply. If count > 20 000 (USGS hard limit), we do NOT run the query and ask the user to narrow the search. If count is 0, we go straight to `'empty'` without running the query. This prevents the 400/503 failures that oversized result queries trigger.
+
+**Shared retry wrapper.** The retry/backoff/error-classification loop lives in a single internal function inside `src/lib/api.js`. Both `fetchCount` and `fetchEarthquakes` go through it — the policy is defined once and not duplicated.
+
+**Concurrency via requestId, not AbortSignal.** Out-of-order responses are handled by an incrementing `requestId` in `useEarthquakeQuery`: any response (from the count leg or the query leg) whose `requestId` is no longer current is silently discarded. There is no external `AbortSignal` cancellation; the form is also disabled during loading, preventing a second submit. The only `AbortSignal` in play is the internal per-attempt timeout inside `attemptFetch`, which is unrelated to concurrency.
 
 **Deployment:** The app is a static build served by nginx in a multi-stage Docker image
 (Node build stage → nginx:alpine serve stage). nginx serves the compiled SPA only; USGS
@@ -90,8 +101,11 @@ story's code.
 
 **Tradeoffs accepted:**
 
-- Large date ranges may produce slow responses or a USGS HTTP 400. We surface this as an
-  error state with a clear message; we do not add client-side range limiting in Story 1.
+- The count-first check prevents the 20 000-result limit error (the former HTTP 400) and
+  makes the oversized-query HTTP 503 far less likely. Very large date ranges can still make
+  the count call itself slow, and transient server/network errors can still occur — both are
+  handled by the shared retry policy and surfaced via `toUserMessage`. We do not add a hard
+  date-range cap; the count check is the gate instead.
 - No caching: every submit fires a fresh request. Deferred to bonus.
 
 ---
@@ -103,27 +117,27 @@ story's code.
 ```
 App                        (owns FetchState + FilterCriteria via useEarthquakeQuery)
 ├── MapView                (prop: earthquakes[])
-└── FilterPanel            (props: status, attemptCount, criteria, errors, onSubmit)
+└── FilterPanel            (props: status, criteria, errors, onSubmit)
     ├── FilterForm         (controlled; props: values, errors; emits: onSubmit)
-    └── StatusBanner       (presentational; props: status, attemptCount)
+    └── StatusBanner       (presentational; props: status)
 ```
 
 ### Hook
 
 **`src/hooks/useEarthquakeQuery.js`**
-Owns: `FilterCriteria`, `status: FetchState`, `earthquakes: Earthquake[]`,
-`attemptCount: number`, `requestId` counter, per-attempt timeout logic.
-Exposes: `{ status, earthquakes, attemptCount, criteria, submit, retry }`.
+Owns: `FilterCriteria`, `status: FetchState`, `earthquakes: Earthquake[]`, `requestId` counter.
+Exposes: `{ status, earthquakes, criteria, errors, errorMessage, submit, retry }`.
 
 `retry` reuses the last submitted `FilterCriteria`; it does not re-open the form.
 
 ### Services and lib modules
 
-| Module                  | Exports                                                         |
-| ----------------------- | --------------------------------------------------------------- |
-| `src/lib/validation.js` | `validateFilters(criteria)`                                     |
-| `src/lib/api.js`        | `buildQueryUrl(criteria)`, `fetchEarthquakes(criteria, signal)` |
-| `src/lib/mappers.js`    | `toEarthquakes(featureCollection)`                              |
+| Module                     | Exports                                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/validation.js`    | `validateFilters(criteria)`                                                                                                        |
+| `src/lib/api.js`           | `buildQueryUrl(criteria)`, `buildCountUrl(criteria)`, `fetchCount(criteria, onAttempt?)`, `fetchEarthquakes(criteria, onAttempt?)` |
+| `src/lib/mappers.js`       | `toEarthquakes(featureCollection)`                                                                                                 |
+| `src/lib/errorMessages.js` | `toUserMessage(error): string`                                                                                                     |
 
 ---
 
@@ -148,17 +162,30 @@ Numbered in execution order. Each is independently testable.
 - Returns the full USGS FDSNWS URL:
   `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime={starttime}&endtime={endtime}T23:59:59&minmagnitude={minMagnitude}`
 
-**3. `fetchEarthquakes(criteria: FilterCriteria, signal: AbortSignal) → Promise<GeoJSON FeatureCollection>`**
+**3. `buildCountUrl(criteria: FilterCriteria) → string`**
+
+- Same parameters as `buildQueryUrl` but targets `/count` instead of `/query` and omits `format=geojson`.
+- Applies the same `T23:59:59` suffix to `endtime` for a consistent date range.
+- Returns: `https://earthquake.usgs.gov/fdsnws/event/1/count?starttime={starttime}&endtime={endtime}T23:59:59&minmagnitude={minMagnitude}`
+
+**4. `fetchCount(criteria: FilterCriteria, onAttempt?: (n: number) => void) → Promise<number>`**
+
+- Calls `buildCountUrl(criteria)` to construct the URL.
+- Goes through the shared retry wrapper (same policy and per-attempt timeout as `fetchEarthquakes`).
+- On success: parses the plain-text integer body and returns it as a `number`.
+- Throws on any terminal failure; caller maps to `FetchState = 'error'`.
+
+**5. `fetchEarthquakes(criteria: FilterCriteria, onAttempt?: (n: number) => void) → Promise<GeoJSON FeatureCollection>`**
 
 - Calls `buildQueryUrl(criteria)` to construct the URL.
-- Per-attempt timeout: **10 seconds** (implemented via `AbortSignal.timeout` or equivalent).
+- Goes through the shared retry wrapper (same per-attempt timeout: **10 seconds**).
 - Retry policy (3 total attempts):
   - Retryable: network failure, timeout, HTTP 5xx, HTTP 429 → wait 1s (retry 1) or 2s (retry 2), then retry.
   - Non-retryable: HTTP 4xx ≠ 429 → throw immediately, no retries.
   - After 3 failed retryable attempts → throw.
 - Throws on any terminal failure; caller maps the error to `FetchState = 'error'`.
 
-**4. `toEarthquakes(featureCollection) → { earthquakes: Earthquake[], skippedCount: number }`**
+**6. `toEarthquakes(featureCollection) → { earthquakes: Earthquake[], skippedCount: number }`**
 
 - Iterates over `featureCollection.features`.
 - Drops any feature where `feature.geometry` is null or missing (`skippedCount++`).
@@ -166,24 +193,28 @@ Numbered in execution order. Each is independently testable.
 - Maps each kept feature to `Earthquake { place, mag, time, coordinates }`.
 - **Never throws.** All null/missing property access is guarded.
 
-**5. FetchState transitions (inside `useEarthquakeQuery`)**
+**7. FetchState transitions (inside `useEarthquakeQuery`)**
 
 - On `submit(criteria)`:
   - Run `validateFilters`. If invalid: stay `idle`, surface errors to `FilterPanel`. No fetch.
-  - If valid: increment `requestId`, set `status = 'loading'`, `attemptCount = 1`, call `fetchEarthquakes`.
-- On successful response (and `requestId` still current):
+  - If valid: increment `requestId`, set `status = 'loading'`.
+  - Call `fetchCount(criteria)` (same `requestId` guard applies):
+    - count > 20 000 (and `requestId` still current): create `TOO_MANY_RESULTS` marker, `status = 'error'`. No query fired.
+    - count === 0 (and `requestId` still current): `status = 'empty'`. No query fired.
+    - otherwise: call `fetchEarthquakes(criteria)` as before.
+- On successful `fetchEarthquakes` response (and `requestId` still current):
   - `toEarthquakes(response)` → if `earthquakes.length > 0`: `status = 'success'`; else: `status = 'empty'`.
-- On retryable failure: increment `attemptCount`, wait backoff, retry. UI shows "Retrying…" label.
+- On retryable failure: wait backoff, retry internally. The hook stays in `'loading'`; no UI state changes during retry.
 - On terminal failure (retries exhausted or non-retryable): `status = 'error'`. The form retains the `FilterCriteria` the user submitted — inputs are not cleared. `FilterPanel` syncs its local field state from the stored `criteria` prop rather than resetting.
-- On stale response (`requestId` mismatch): discard silently, make no state change.
-- On `retry()`: reuse last submitted `FilterCriteria`, reset `attemptCount = 1`, set `status = 'loading'`.
+- On stale response (`requestId` mismatch from count or query): discard silently, make no state change.
+- On `retry()`: reuse last submitted `FilterCriteria`, set `status = 'loading'`.
 
-**6. Map source and layer setup (inside `MapView`, on `map.on('load')`)**
+**8. Map source and layer setup (inside `MapView`, on `map.on('load')`)**
 
 - `map.addSource('earthquakes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })`
 - `map.addLayer({ id: 'earthquakes', type: 'circle', source: 'earthquakes', paint: { 'circle-radius': 5, 'circle-color': '#e74c3c', 'circle-opacity': 0.8 } })`
 
-**7. Guarded `setData` (inside `MapView`, in the `useEffect` watching `earthquakes` prop)**
+**9. Guarded `setData` (inside `MapView`, in the `useEffect` watching `earthquakes` prop)**
 
 - Before calling `map.getSource('earthquakes').setData(...)`:
   - Check `map.loaded() === true`.
@@ -215,16 +246,16 @@ Numbered in execution order. Each is independently testable.
 
 ### UI copy (fixed strings — do not vary)
 
-| State                             | Copy                                                         |
-| --------------------------------- | ------------------------------------------------------------ |
-| `loading`, `attemptCount = 1`     | "Loading…"                                                   |
-| `loading`, `attemptCount = 2`     | "Retrying (1/2)…"                                            |
-| `loading`, `attemptCount = 3`     | "Retrying (2/2)…"                                            |
-| `empty`                           | "No earthquakes found"                                       |
-| `error` (after retries exhausted) | "Please try again in a few minutes."                         |
-| `error` (non-retryable, e.g. 400) | "The request was invalid. Check your filters and try again." |
+| State                                      | Copy                                                                                    |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `loading`                                  | "Loading…"                                                                              |
+| `empty`                                    | "No earthquakes found"                                                                  |
+| `error` (after retries exhausted)          | "Please try again in a few minutes."                                                    |
+| `error` (non-retryable, e.g. 400)          | "The request was invalid. Check your filters and try again."                            |
+| `error` (too many results, count > 20 000) | "Your query is too broad. Please narrow the date range or raise the minimum magnitude." |
 
 ### Testing (this story)
+
 - **`validateFilters`**: cover AC1 (start > end), AC2 (missing / out-of-range), AC6 (non-date / non-numeric input), future-date rejection, and the valid case.
 - **`buildQueryUrl`**: assert `endtime` always gets `T23:59:59` appended (Safeguard 4).
 - **`toEarthquakes`**: cover null/missing geometry (dropped + `skippedCount`), null mag (kept), and that it never throws on malformed input (Safeguard 8).
@@ -253,3 +284,7 @@ These are non-negotiable. No implementation may bypass them.
 8. **`toEarthquakes` never throws.** All property accesses on raw USGS features are guarded. The function always returns `{ earthquakes: [], skippedCount: 0 }` at minimum, regardless of malformed input.
 
 9. **On entering the error state, the form retains the FilterCriteria the user submitted — inputs are never cleared on failure.** `FilterPanel` syncs its local field state from the `criteria` prop rather than resetting to blank.
+
+10. **Every full-results query is gated by a count check.** `fetchEarthquakes` is never called when `fetchCount` returns a value > 20 000. The count check runs first within the same `requestId` guard — it cannot be bypassed.
+
+11. **All user-facing error strings come from `errorMessages.js`.** `toUserMessage(error)` is the single source of truth for display text. No error string is hardcoded in any component, hook, or service.
