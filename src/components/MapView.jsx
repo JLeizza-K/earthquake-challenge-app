@@ -1,10 +1,49 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import {
+  CLASS_COLORS,
+  NULL_COLOR,
+  RADIUS_NULL,
+  RADIUS_ANCHORS,
+  POINT_FACTOR,
+} from '../lib/magnitudeStyle.js';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const EMPTY_FC = { type: 'FeatureCollection', features: [] };
-const LAYER_PAINT = { 'circle-radius': 5, 'circle-color': '#e74c3c', 'circle-opacity': 0.8 };
+
+function buildColorExpr() {
+  return [
+    'case',
+    ['==', ['get', 'mag'], null],
+    NULL_COLOR,
+    ['<', ['get', 'mag'], 3.0],
+    CLASS_COLORS.micro,
+    ['<', ['get', 'mag'], 4.0],
+    CLASS_COLORS.minor,
+    ['<', ['get', 'mag'], 5.0],
+    CLASS_COLORS.light,
+    ['<', ['get', 'mag'], 6.0],
+    CLASS_COLORS.moderate,
+    ['<', ['get', 'mag'], 7.0],
+    CLASS_COLORS.strong,
+    ['<', ['get', 'mag'], 8.0],
+    CLASS_COLORS.major,
+    CLASS_COLORS.great,
+  ];
+}
+
+function buildCurveExpr() {
+  return ['interpolate', ['linear'], ['get', 'mag'], ...RADIUS_ANCHORS];
+}
+
+function buildAuraRadiusExpr() {
+  return ['case', ['==', ['get', 'mag'], null], 0, buildCurveExpr()];
+}
+
+function buildPointRadiusExpr() {
+  return ['case', ['==', ['get', 'mag'], null], RADIUS_NULL, ['*', buildCurveExpr(), POINT_FACTOR]];
+}
 
 function toFeatureCollection(earthquakes) {
   return {
@@ -19,7 +58,26 @@ function toFeatureCollection(earthquakes) {
 
 function setupLayer(map) {
   map.addSource('earthquakes', { type: 'geojson', data: EMPTY_FC });
-  map.addLayer({ id: 'earthquakes', type: 'circle', source: 'earthquakes', paint: LAYER_PAINT });
+  map.addLayer({
+    id: 'earthquakes-halo',
+    type: 'circle',
+    source: 'earthquakes',
+    paint: {
+      'circle-color': buildColorExpr(),
+      'circle-radius': buildAuraRadiusExpr(),
+      'circle-opacity': 0.5,
+    },
+  });
+  map.addLayer({
+    id: 'earthquakes',
+    type: 'circle',
+    source: 'earthquakes',
+    paint: {
+      'circle-color': buildColorExpr(),
+      'circle-radius': buildPointRadiusExpr(),
+      'circle-opacity': 0.8,
+    },
+  });
 }
 
 function applyEarthquakes(map, earthquakes) {
