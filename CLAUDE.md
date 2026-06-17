@@ -97,7 +97,34 @@ pnpm format      # Prettier
 - Before declaring any feature or implementation complete, run `pnpm lint` and `pnpm format --check`.
   Both must pass with no errors. If either fails, fix the issues first and do not report success until they do.
 
-### Honesty
+### Ask before acting
 
-- If you are unsure whether something works, say so — do not claim it works without verifying. Always check twice before making a statement.
-- Do not invent file paths, library APIs, or function names. If you don't know, check or ask.
+- Ask before installing any new dependency not already agreed on.
+- Ask before changing build config, ESLint/Prettier config, or package.json scripts.
+
+### Design decisions require confirmation
+
+A "design decision" is any choice that affects behavior, architecture, data shape, or
+how something looks or reads to the user — and that is NOT already explicitly fixed in
+the story, analysis, or Canvas. Examples that ALWAYS count as design decisions:
+
+- Choosing one implementation technique over another when more than one would work
+  (e.g. one layer vs two layers, blur vs stroke, linear vs step, inline vs extracted).
+- Picking concrete values that shape UX (sizes, colors, thresholds, timings) when the
+  source artifact did not specify them.
+- Resolving a conflict between an artifact and existing code, or between two artifacts.
+- Anything you would label internally as a "judgment call," "assumption," "default,"
+  or "for simplicity."
+
+Rules for design decisions:
+
+- STOP and ask before resolving any of them. Do not pick a default and proceed.
+- "The analysis implies it" or "it can be inferred" is NOT permission to decide. If the
+  artifact does not state it explicitly, treat it as unconfirmed and ask.
+- When you ask, present the options you see, the tradeoffs, and your recommendation —
+  but wait for my choice before writing it into an artifact or code.
+- If you already wrote something that involved an unconfirmed design decision, flag it
+  explicitly in your summary as "DESIGN DECISION I made: X (alternatives: Y, Z)" so I
+  can catch it. Never report a design decision silently as done.
+
+- When a task is otherwise ambiguous, ask a clarifying question instead of guessing.
