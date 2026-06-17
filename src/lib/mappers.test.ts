@@ -8,13 +8,12 @@ type FeatureOverride = Partial<{
   properties: UsgsFeature['properties'];
 }>;
 
-const makeFeature = (overrides: FeatureOverride = {}): UsgsFeature =>
-  ({
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [-118.2437, 34.0522, 10] },
-    properties: { place: 'Los Angeles', mag: 3.5, time: 1700000000000 },
-    ...overrides,
-  }) as UsgsFeature;
+const makeFeature = (overrides: FeatureOverride = {}): UsgsFeature => ({
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [-118.2437, 34.0522, 10] },
+  properties: { place: 'Los Angeles', mag: 3.5, time: 1700000000000 },
+  ...overrides,
+});
 
 const makeFC = (features: UsgsFeature[]) => ({ type: 'FeatureCollection', features });
 
