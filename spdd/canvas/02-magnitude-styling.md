@@ -7,7 +7,7 @@
 ### What we deliver
 
 - Marker radius driven by the `mag` property of each GeoJSON feature, following a
-  calibrated linear curve (min/max defined in Operations).
+  calibrated concave curve (anchors defined in Operations).
 - Marker color driven by the USGS magnitude class, using a discrete seven-color warm
   palette (values defined in Operations).
 - A translucent aura of the same color at ~50% opacity surrounding each point.
@@ -57,21 +57,21 @@ All events below 3.0 are grouped under "micro." This differs slightly from the U
 micro cutoff (~2.0) but covers the full 0–10 filter range without orphan classes.
 Boundary values belong to the upper class (≥ comparison).
 
-| Class    | Magnitude range   | Boundary rule               |
-| -------- | ----------------- | --------------------------- |
-| micro    | < 3.0             | default / below-minor catch |
-| minor    | 3.0 – 3.9         | ≥ 3.0                       |
-| light    | 4.0 – 4.9         | ≥ 4.0                       |
-| moderate | 5.0 – 5.9         | ≥ 5.0                       |
-| strong   | 6.0 – 6.9         | ≥ 6.0                       |
-| major    | 7.0 – 7.9         | ≥ 7.0                       |
-| great    | ≥ 8.0             | ≥ 8.0                       |
+| Class    | Magnitude range | Boundary rule               |
+| -------- | --------------- | --------------------------- |
+| micro    | < 3.0           | default / below-minor catch |
+| minor    | 3.0 – 3.9       | ≥ 3.0                       |
+| light    | 4.0 – 4.9       | ≥ 4.0                       |
+| moderate | 5.0 – 5.9       | ≥ 5.0                       |
+| strong   | 6.0 – 6.9       | ≥ 6.0                       |
+| major    | 7.0 – 7.9       | ≥ 7.0                       |
+| great    | ≥ 8.0           | ≥ 8.0                       |
 
 ### Null-magnitude as a distinct visual state
 
 `null` is not a class. It is a separate rendering branch that resolves before any class
 logic. A null-magnitude event receives its own fixed color, fixed radius, and no aura
-(blur 0 — hard edge). It never receives a class color or class radius.
+(halo layer radius 0 — physically absent). It never receives a class color or class radius.
 
 ---
 
@@ -85,19 +85,23 @@ constants (`circle-radius: 5`, `circle-color: '#e74c3c'`, `circle-opacity: 0.8`)
 Everything else in the Story 1 architecture — source ID, layer ID, `setData` flow,
 `requestId` guard, count-first pattern, and `toEarthquakes` mapper — is untouched.
 
-### Size: linear interpolation over the magnitude number
+### Size: the aura carries the magnitude encoding
 
-Radius is a linear function of the raw magnitude number (not energy, which would produce
-extreme ratios). A continuous linear curve lets events within the same class still differ
-slightly in size, giving a richer representation than a step function would. The minimum
-and maximum radii are calibrated so a magnitude-3 and magnitude-7 event are visually
-distinguishable at a glance (see Operations for exact values).
+The aura (halo layer) radius is a continuous function of the raw magnitude number — not
+energy, which would produce extreme ratios. A concave curve adds more resolution in the
+3–6 band where most catalog events fall, and avoids extreme sizes at the top of the
+scale. The result is that the viewer reads magnitude through the aura's size, not the
+solid point's.
 
-Out-of-range values are clamped: negative magnitudes get the minimum radius, and
+The solid point (main layer) is a small epicenter locator fixed at 20% of the aura
+radius. It does not independently encode magnitude — it marks the precise location while
+the aura communicates severity.
+
+Out-of-range values are clamped: negative magnitudes get the minimum aura radius, and
 magnitudes above 10 get the maximum.
 
-**Tradeoff accepted:** color is step-function (discrete per class) while radius is
-continuous (linear interpolation). This slight inconsistency is the correct trade-off
+**Tradeoff accepted:** color is step-function (discrete per class) while aura radius is
+continuous (piecewise interpolation). This slight inconsistency is the correct trade-off
 — radius encodes a continuous quantity while color encodes a categorical one. A step
 radius would discard within-class information unnecessarily.
 
@@ -110,22 +114,25 @@ function reflects the categorical nature of the classification.
 The palette varies lightness and saturation across classes (not hue shift alone), so
 differences remain readable for users with red-green color vision deficiencies.
 
-### Aura: circle-blur on the single circle layer
+### Aura: second circle layer below the main layer
 
-The aura is achieved via `circle-blur` on the existing `earthquakes` layer — no
-additional layer is added. `circle-blur` makes the circle's edges fade to transparent
-within the radius, producing a soft translucent glow of the same color as the fill.
-The center of the circle retains high opacity while the outer portion fades, reading as
-a solid point surrounded by a translucent aura. The exact blur value is in Operations.
+Two layers share the same `geojson` source:
 
-For null-magnitude events `circle-blur` is set to 0, giving a hard-edged point with no
-soft glow — the aura is absent, not merely reduced.
+- **`earthquakes-halo` (below):** the large, translucent, same-color circle. Its radius
+  follows the magnitude curve — this is what communicates severity. Opacity ~0.5.
+- **`earthquakes` (above):** a small solid locator dot at 20% of the halo radius. It
+  marks the epicenter without competing with the aura for size attention. Opacity 0.8.
+
+For null-magnitude events the halo radius is 0 (physically absent). The solid point is a
+fixed 4 px grey dot — it does not apply the aura × 0.2 formula. This is a deliberate
+design decision: null events explicitly bypass the proportional formula and use a fixed
+size so they remain visible on the map as a distinct "no data" marker.
 
 ### Null-magnitude: first-branch resolution
 
-All three paint dimensions (color, radius, circle-blur value) resolve null before any
-class logic. The null branches produce coherent output: grey color, small fixed radius,
-blur 0. No null event can fall through into a class encoding.
+All three paint dimensions (color, radius, halo radius) resolve null before any class
+logic. The null branches produce coherent output: grey color, small fixed radius,
+halo radius 0. No null event can fall through into a class encoding.
 
 ---
 
@@ -134,15 +141,19 @@ blur 0. No null event can fall through into a class encoding.
 ### Files that change
 
 **`src/components/MapView.jsx`**
+
 - `LAYER_PAINT` constant removed.
-- `setupLayer` updated to add the single `earthquakes` layer with data-driven paint
-  expressions (color, radius, circle-blur). One layer, same as Story 1.
+- `setupLayer` updated to add TWO layers: `earthquakes-halo` first (below), then
+  `earthquakes` (above). Both share the same `geojson` source. Layer order is
+  significant — halo must be inserted before the main layer.
 - No changes to `toFeatureCollection`, `applyEarthquakes`, or the `useEffect` logic.
 
 **New: `src/lib/magnitudeStyle.js`**
-- Exports the class color table (7 entries), the null color, the radius constants (min,
-  max, null fixed size), the blur constants (non-null blur value, null blur value = 0),
-  and a pure function `getMagnitudeClass(mag)`.
+
+- Exports the class color table (7 entries), the null color, the aura radius constants
+  (min 4, max 52, null fixed 4), the radius anchor array (`RADIUS_ANCHORS`), the point
+  factor (`POINT_FACTOR = 0.2`), and a pure function `getMagnitudeClass(mag)`.
+  `HALO_OFFSET` is removed.
 - `getMagnitudeClass` takes a magnitude number (or null) and returns the class name or
   `'null-data'`. This is the testable unit.
 - `MapView.jsx` imports from this module to build the paint expressions. The mapping
@@ -180,47 +191,44 @@ Null-magnitude: `#9E9E9E` (neutral mid-grey, clearly outside the warm scale).
 These colors are verified against the blue/green OpenFreeMap liberty basemap — warm
 hues contrast strongly against the basemap's cool/neutral palette.
 
-### Radius curve
+### Radius curve (aura layer)
 
-Linear interpolation between two anchor points. Out-of-range values are clamped.
+Piecewise linear interpolation across seven anchor points, producing a concave shape with
+more resolution in the 3–6 band. This curve applies to the **aura (`earthquakes-halo`)
+layer**. The solid point is derived from it (see Aura section). This is a first-pass
+calibration to be tuned after visual review. Out-of-range values are clamped.
 
-| Condition               | Radius  |
-| ----------------------- | ------- |
-| Null magnitude (fixed)  | 4 px    |
-| Negative magnitude      | 5 px (clamp to lower anchor) |
-| Magnitude 0             | 5 px    |
-| Magnitude 5 (mid-scale) | ~15 px  |
-| Magnitude 10            | 24 px   |
-| Magnitude > 10          | 24 px (clamp to upper anchor) |
+| Condition              | Aura radius                    |
+| ---------------------- | ------------------------------ |
+| Negative magnitude     | 4 px (clamp to mag-0 anchor)   |
+| Magnitude 0            | 4 px                           |
+| Magnitude 2            | 8 px                           |
+| Magnitude 4            | 16 px                          |
+| Magnitude 5            | 24 px                          |
+| Magnitude 6            | 34 px                          |
+| Magnitude 8            | 44 px                          |
+| Magnitude 10           | 52 px                          |
+| Magnitude > 10         | 52 px (clamp to mag-10 anchor) |
+| Null magnitude (fixed) | 0 px (halo absent)             |
 
-Min radius: **5 px** (at mag 0). Max radius: **24 px** (at mag 10). Formula:
-`radius = 5 + (mag / 10) × 19`, clamped to [5, 24] for non-null events.
+Min aura radius: **4 px** (at mag 0). Max aura radius: **52 px** (at mag 10).
 
-The area ratio between the minimum (r=5, area≈79 px²) and the maximum (r=24, area≈1810
-px²) is ~23×, giving an unambiguous visual spread without oversized circles at country
-zoom levels.
+### Aura / halo layer
 
-The null fixed size (4 px) is intentionally below the non-null minimum (5 px), so a
-null event is always smaller than the smallest measurable earthquake.
+| Layer                 | Property          | Value                                          |
+| --------------------- | ----------------- | ---------------------------------------------- |
+| `earthquakes-halo`    | Color             | Same per-class / null expression as main layer |
+| `earthquakes-halo`    | Opacity           | 0.5                                            |
+| `earthquakes-halo`    | Radius (non-null) | From the magnitude curve (4–52 px)             |
+| `earthquakes-halo`    | Radius (null)     | 0 px — physically absent                       |
+| `earthquakes` (point) | Color             | Same per-class / null expression               |
+| `earthquakes` (point) | Opacity           | 0.8                                            |
+| `earthquakes` (point) | Radius (non-null) | 20% of the aura radius (POINT_FACTOR = 0.2)    |
+| `earthquakes` (point) | Radius (null)     | 4 px fixed — ensures null events stay visible  |
 
-### Aura / blur
-
-Implemented via `circle-blur` on the single `earthquakes` layer. The blur fades the
-circle's edges toward transparent within the radius, producing a soft glow of the same
-color as the fill. No second layer is added.
-
-| Property              | Value                                                   |
-| --------------------- | ------------------------------------------------------- |
-| `circle-blur` (non-null) | **0.4** — outer ~40% of radius fades to transparent  |
-| `circle-blur` (null)  | 0 — hard edge, no soft glow                             |
-
-`circle-opacity` remains 0.8 for all events (null and non-null). The blur operates on
-top of that opacity — the center of a non-null circle reads as ~80% opaque; the edge
-fades from there.
-
-The blur value 0.4 is a first-pass proposal. It produces a visible, soft aura while
-keeping the solid-center read of the circle. Adjust up (more diffuse) or down (harder
-edge) based on visual review against the basemap.
+The `POINT_FACTOR` (0.2) is exported from `magnitudeStyle.js`. The solid point's radius
+for non-null events is computed as `aura_radius × 0.2`, never independently from the
+magnitude curve.
 
 ### Main circle opacity
 
@@ -231,22 +239,22 @@ edge) based on visual review against the basemap.
 
 For every paint expression, the null check is the first branch. The sequence is:
 
-1. If `mag` is null → apply null styling (grey, 4 px, blur 0).
-2. Else → apply class-based color, linear radius, and blur 0.4.
+1. If `mag` is null → apply null styling: grey color, solid point 4 px fixed, aura radius 0.
+2. Else → apply class-based color, aura radius from the magnitude curve, solid point = aura × 0.2.
 
-The same ordering applies independently to color, radius, and circle-blur so that the
-three dimensions remain coherent. A null event cannot receive a class color with a null
-radius, or a class radius with a soft aura from a separate path.
+The same ordering applies independently to color, aura radius, and solid-point radius so
+that all three dimensions remain coherent. A null event cannot receive a class color with
+a null radius, or a class radius with a visible halo from a separate path.
 
 ### Negative magnitudes and magnitudes above 10
 
 Negative magnitudes: real earthquakes, not null. They fall in micro class for color (the
 micro class covers all values below 3.0, which includes negatives). For radius, the
-linear interpolation clamps at the lower anchor (mag 0 → 5 px), so negative values get
-5 px.
+interpolation clamps at the lower anchor (mag 0 → 4 px aura), so negative values get
+a 4 px aura and a 0.8 px solid point.
 
 Magnitudes above 10: fall in great class. For radius, the interpolation clamps at the
-upper anchor (mag 10 → 24 px). No special handling required beyond the clamp.
+upper anchor (mag 10 → 52 px aura). No special handling required beyond the clamp.
 
 An explicit fallback clause in the paint expressions covers any value that does not
 match a step condition, preventing undefined rendering.
@@ -307,8 +315,8 @@ These are non-negotiable. No implementation may bypass them.
    evaluated before any class comparison. There is no code path where `mag: null` falls
    through to a class encoding.
 
-2. **Null events have no aura.** The `circle-blur` paint expression must resolve to 0
-   for null-magnitude features. Any non-zero blur on a null event violates AC4 even if
+2. **Null events have no aura.** The `earthquakes-halo` layer must produce a radius of
+   0 for null-magnitude features. A non-zero halo on a null event violates AC4 even if
    the fill color and radius are correct.
 
 3. **Boundary values land in exactly one class.** The ≥ comparisons must be consistent:
@@ -320,8 +328,14 @@ These are non-negotiable. No implementation may bypass them.
    `applyEarthquakes` / `setData` logic are unchanged. Only paint properties change.
 
 5. **The map is still initialized exactly once.** The `useRef` guard in `MapView` is
-   preserved. `setupLayer` adds one circle layer, the same count as Story 1.
+   preserved. `setupLayer` adds two circle layers (`earthquakes-halo` + `earthquakes`);
+   neither initialization path runs more than once.
 
-6. **All three paint dimensions (color, radius, circle-blur) handle null coherently.**
-   A null event must receive grey + 4 px + blur 0. Any mismatch — e.g. grey color but
-   class-derived radius, or correct size but non-zero blur — is a violation of AC4.
+6. **Halo layer is inserted below the main layer.** The `earthquakes-halo` `addLayer`
+   call must precede the `earthquakes` `addLayer` call in `setupLayer`. Reversing the
+   order renders the aura on top of the solid circle, obscuring it.
+
+7. **All three paint dimensions (color, solid-point radius, aura radius) handle null coherently.**
+   A null event must receive grey + solid point 4 px fixed + aura radius 0. Any mismatch
+   — e.g. grey color but class-derived radius, or correct size but non-zero aura — is a
+   violation of AC4.

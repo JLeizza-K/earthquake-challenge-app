@@ -10,15 +10,15 @@ Earthquake magnitude is already a **logarithmic scale**. Each integer step repre
 
 The story defines seven named classes using a deliberate simplification: all events below 3.0 are grouped under "micro," which covers the full filter range (0–10) without orphan classes. This differs slightly from the official USGS micro cutoff (~2.0), an accepted trade-off for scale simplicity:
 
-| Magnitude   | Class    |
-| ----------- | -------- |
-| < 3.0       | micro    |
-| 3.0 – 3.9   | minor    |
-| 4.0 – 4.9   | light    |
-| 5.0 – 5.9   | moderate |
-| 6.0 – 6.9   | strong   |
-| 7.0 – 7.9   | major    |
-| ≥ 8.0       | great    |
+| Magnitude | Class    |
+| --------- | -------- |
+| < 3.0     | micro    |
+| 3.0 – 3.9 | minor    |
+| 4.0 – 4.9 | light    |
+| 5.0 – 5.9 | moderate |
+| 6.0 – 6.9 | strong   |
+| 7.0 – 7.9 | major    |
+| ≥ 8.0     | great    |
 
 Each class is a **discrete category**. A feature belongs to exactly one class, determined by its `mag` value. There is no blending between classes.
 
@@ -69,6 +69,7 @@ USGS returns `mag: null` for events where a magnitude estimate is pending, where
 ### Null magnitude ≠ magnitude 0
 
 A magnitude-0 event belongs to the micro class and has a meaningful radius and a class color. Treating null as 0 would:
+
 - Assign it the micro class color (implying the magnitude is known to be low).
 - Render it with a radius implying a measured magnitude.
 - Apply the halo that AC4 explicitly forbids.
@@ -89,9 +90,10 @@ The null-magnitude case must be resolved before any class logic, and must apply 
 
 **E1 — Magnitudes outside the 0–10 range.**
 USGS data includes events with negative magnitudes (very small events in highly sensitive networks) and historically has reached 9.5. The encoding must handle these gracefully:
+
 - Negative magnitudes: they are real earthquakes, not null. They should fall into the micro class (< 3.0) — the expression must not break or produce undefined rendering for negative values.
 - Magnitudes ≥ 8.0 up to extreme values (9.5+): these fall in the great class. The expression should not break for values above 8.0.
-The safest approach is an explicit fallback/`otherwise` clause in the paint expression.
+  The safest approach is an explicit fallback/`otherwise` clause in the paint expression.
 
 **E2 — Boundary values (exactly 3.0, 4.0, 5.0, 6.0, 7.0, 8.0).**
 These must be assigned to exactly one class (see R5). Ambiguity causes inconsistent rendering. The comparison operators must be chosen so that the boundary value is unambiguously included in the higher class.
