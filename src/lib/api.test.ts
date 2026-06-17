@@ -1,35 +1,30 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { buildCountUrl, fetchCount } from './api.js';
+import { buildQueryUrl, fetchEarthquakes } from './api.js';
 
 const CRITERIA = { starttime: '2024-01-01', endtime: '2024-01-07', minMagnitude: 4 };
+const MOCK_FC = { type: 'FeatureCollection', features: [] };
 
-describe('buildCountUrl', () => {
-  it('targets /count, not /query', () => {
-    const url = buildCountUrl(CRITERIA);
-    expect(url).toContain('/count?');
-    expect(url).not.toContain('/query');
-  });
-
-  it('omits format=geojson', () => {
-    const url = buildCountUrl(CRITERIA);
-    expect(url).not.toContain('format=');
-  });
-
+describe('buildQueryUrl — endtime inclusivity (Safeguard 4)', () => {
   it('appends T23:59:59 to endtime', () => {
-    const url = buildCountUrl(CRITERIA);
+    const url = buildQueryUrl(CRITERIA);
     expect(url).toContain('endtime=2024-01-07T23%3A59%3A59');
   });
 
-  it('includes starttime and minmagnitude', () => {
-    const url = buildCountUrl(CRITERIA);
+  it('includes starttime and minmagnitude unchanged', () => {
+    const url = buildQueryUrl(CRITERIA);
     expect(url).toContain('starttime=2024-01-01');
     expect(url).toContain('minmagnitude=4');
   });
+
+  it('always appends T23:59:59 regardless of input', () => {
+    const url = buildQueryUrl({ ...CRITERIA, endtime: '2024-12-31' });
+    expect(url).toContain('endtime=2024-12-31T23%3A59%3A59');
+  });
 });
 
-async function runCountWithTimers(mockFetch) {
+async function runWithTimers(mockFetch: typeof fetch) {
   vi.stubGlobal('fetch', mockFetch);
-  const p = fetchCount(CRITERIA, vi.fn());
+  const p = fetchEarthquakes(CRITERIA, vi.fn());
   p.catch(() => {});
   await vi.runAllTimersAsync();
   return p;
@@ -40,32 +35,33 @@ function teardown() {
   vi.unstubAllGlobals();
 }
 
-describe('fetchCount — success', () => {
+describe('fetchEarthquakes — success on first attempt', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('resolves to a number parsed from plain-text body', async () => {
-    const mock = vi.fn().mockResolvedValue({ ok: true, text: async () => '1234' });
+  it('resolves immediately without retrying', async () => {
+    const mock = vi.fn().mockResolvedValue({ ok: true, json: async () => MOCK_FC });
     vi.stubGlobal('fetch', mock);
-    const result = await fetchCount(CRITERIA, vi.fn());
-    expect(result).toBe(1234);
-    expect(typeof result).toBe('number');
-  });
-
-  it('resolves to 0 when body is "0"', async () => {
-    const mock = vi.fn().mockResolvedValue({ ok: true, text: async () => '0' });
-    vi.stubGlobal('fetch', mock);
-    const result = await fetchCount(CRITERIA, vi.fn());
-    expect(result).toBe(0);
+    const result = await fetchEarthquakes(CRITERIA, vi.fn());
+    expect(result).toEqual(MOCK_FC);
+    expect(mock).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('fetchCount — retryable errors', () => {
+describe('fetchEarthquakes — retryable errors', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(teardown);
 
+  it('retries on network failure (TypeError) and exhausts 3 attempts', async () => {
+    const mock = vi.fn().mockRejectedValue(new TypeError('Network error'));
+    const p = runWithTimers(mock);
+    await p.catch(() => {});
+    await expect(p).rejects.toThrow();
+    expect(mock).toHaveBeenCalledTimes(3);
+  });
+
   it('retries on HTTP 500 and exhausts 3 attempts', async () => {
     const mock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
-    const p = runCountWithTimers(mock);
+    const p = runWithTimers(mock);
     await p.catch(() => {});
     await expect(p).rejects.toThrow('HTTP 500');
     expect(mock).toHaveBeenCalledTimes(3);
@@ -73,42 +69,42 @@ describe('fetchCount — retryable errors', () => {
 
   it('retries on HTTP 429 and exhausts 3 attempts', async () => {
     const mock = vi.fn().mockResolvedValue({ ok: false, status: 429 });
-    const p = runCountWithTimers(mock);
+    const p = runWithTimers(mock);
     await p.catch(() => {});
     await expect(p).rejects.toThrow('HTTP 429');
     expect(mock).toHaveBeenCalledTimes(3);
   });
-
-  it('retries on network failure (TypeError) and exhausts 3 attempts', async () => {
-    const mock = vi.fn().mockRejectedValue(new TypeError('Network error'));
-    const p = runCountWithTimers(mock);
-    await p.catch(() => {});
-    await expect(p).rejects.toThrow();
-    expect(mock).toHaveBeenCalledTimes(3);
-  });
 });
 
-describe('fetchCount — non-retryable errors', () => {
+describe('fetchEarthquakes — non-retryable errors', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(teardown);
 
   it('does NOT retry on HTTP 400', async () => {
     const mock = vi.fn().mockResolvedValue({ ok: false, status: 400 });
-    const p = runCountWithTimers(mock);
+    const p = runWithTimers(mock);
     await p.catch(() => {});
     await expect(p).rejects.toThrow('HTTP 400');
     expect(mock).toHaveBeenCalledTimes(1);
   });
 
-  it('marks non-retryable errors with nonRetryable flag', async () => {
+  it('does NOT retry on HTTP 403', async () => {
     const mock = vi.fn().mockResolvedValue({ ok: false, status: 403 });
-    const p = runCountWithTimers(mock);
+    const p = runWithTimers(mock);
+    await p.catch(() => {});
+    await expect(p).rejects.toThrow('HTTP 403');
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks non-retryable errors with nonRetryable flag', async () => {
+    const mock = vi.fn().mockResolvedValue({ ok: false, status: 400 });
+    const p = runWithTimers(mock);
     await p.catch(() => {});
     await expect(p).rejects.toMatchObject({ nonRetryable: true });
   });
 });
 
-describe('fetchCount — onAttempt callback', () => {
+describe('fetchEarthquakes — onAttempt callback', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(teardown);
 
@@ -116,7 +112,7 @@ describe('fetchCount — onAttempt callback', () => {
     const mock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
     vi.stubGlobal('fetch', mock);
     const onAttempt = vi.fn();
-    const p = fetchCount(CRITERIA, onAttempt);
+    const p = fetchEarthquakes(CRITERIA, onAttempt);
     p.catch(() => {});
     await vi.runAllTimersAsync();
     expect(onAttempt).toHaveBeenCalledTimes(3);
@@ -126,7 +122,7 @@ describe('fetchCount — onAttempt callback', () => {
   });
 });
 
-describe('fetchCount — second attempt success', () => {
+describe('fetchEarthquakes — second attempt success', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(teardown);
 
@@ -134,12 +130,12 @@ describe('fetchCount — second attempt success', () => {
     const mock = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500 })
-      .mockResolvedValueOnce({ ok: true, text: async () => '42' });
+      .mockResolvedValueOnce({ ok: true, json: async () => MOCK_FC });
     vi.stubGlobal('fetch', mock);
-    const p = fetchCount(CRITERIA, vi.fn());
+    const p = fetchEarthquakes(CRITERIA, vi.fn());
     await vi.runAllTimersAsync();
     const result = await p;
-    expect(result).toBe(42);
+    expect(result).toEqual(MOCK_FC);
     expect(mock).toHaveBeenCalledTimes(2);
   });
 });

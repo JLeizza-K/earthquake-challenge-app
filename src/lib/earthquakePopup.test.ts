@@ -66,8 +66,8 @@ describe('buildPopupContent — null magnitude (AC4)', () => {
 });
 
 describe('buildPopupContent — missing place (AC4)', () => {
-  it('shows "Location unknown" when place is null', () => {
-    const node = buildPopupContent({ mag: 5.4, place: null, time: FIXED_TS });
+  it('shows "Location unknown" when place is empty string', () => {
+    const node = buildPopupContent({ mag: 5.4, place: '', time: FIXED_TS });
     expect(node.textContent).toContain('Location unknown');
   });
 

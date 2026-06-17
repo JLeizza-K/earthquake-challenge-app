@@ -1,4 +1,6 @@
-export const TOO_MANY_RESULTS = { code: 'TOO_MANY_RESULTS' };
+import type { TooManyResultsError } from '../types/index.js';
+
+export const TOO_MANY_RESULTS: TooManyResultsError = { code: 'TOO_MANY_RESULTS' };
 
 // Display label for a datum with no magnitude — NOT a fetch error; never goes through
 // toUserMessage and never affects the app status state machine.
@@ -9,8 +11,8 @@ const MSG_TOO_MANY =
 const MSG_INVALID = 'The request was invalid. Check your filters and try again.';
 const MSG_FALLBACK = 'Please try again in a few minutes.';
 
-export function toUserMessage(error) {
+export function toUserMessage(error: unknown): string {
   if (error === TOO_MANY_RESULTS) return MSG_TOO_MANY;
-  if (error?.nonRetryable) return MSG_INVALID;
+  if ((error as Record<string, unknown> | null)?.nonRetryable) return MSG_INVALID;
   return MSG_FALLBACK;
 }
