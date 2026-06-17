@@ -1,14 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { toEarthquakes } from './mappers.js';
+import type { UsgsFeature } from '../types/index.js';
 
-const makeFeature = (overrides = {}) => ({
+type FeatureOverride = Partial<{
+  type: string;
+  geometry: UsgsFeature['geometry'];
+  properties: UsgsFeature['properties'];
+}>;
+
+const makeFeature = (overrides: FeatureOverride = {}): UsgsFeature => ({
   type: 'Feature',
   geometry: { type: 'Point', coordinates: [-118.2437, 34.0522, 10] },
   properties: { place: 'Los Angeles', mag: 3.5, time: 1700000000000 },
   ...overrides,
 });
 
-const makeFC = (features) => ({ type: 'FeatureCollection', features });
+const makeFC = (features: UsgsFeature[]) => ({ type: 'FeatureCollection', features });
 
 describe('toEarthquakes — null/missing geometry (Safeguard 8)', () => {
   it('drops features with null geometry', () => {

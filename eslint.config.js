@@ -4,6 +4,17 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import prettier from 'eslint-config-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
+import tseslint from 'typescript-eslint';
+
+const sharedRules = {
+  'max-lines-per-function': ['error', { max: 25, skipBlankLines: true, skipComments: true }],
+  'max-params': ['error', 5],
+  complexity: ['error', 10],
+  'max-depth': ['error', 3],
+  'max-lines': ['error', { max: 200, skipBlankLines: true, skipComments: true }],
+  'no-console': 'warn',
+  eqeqeq: ['error', 'always'],
+};
 
 export default defineConfig([
   globalIgnores(['dist']),
@@ -19,14 +30,28 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     rules: {
-      'max-lines-per-function': ['error', { max: 25, skipBlankLines: true, skipComments: true }],
-      'max-params': ['error', 5],
-      complexity: ['error', 10],
-      'max-depth': ['error', 3],
-      'max-lines': ['error', { max: 200, skipBlankLines: true, skipComments: true }],
-      'no-console': 'warn',
-      eqeqeq: ['error', 'always'],
+      ...sharedRules,
       'no-unused-vars': 'error',
+    },
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      ...tseslint.configs.recommendedTypeChecked,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: {
+        project: './tsconfig.app.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      ...sharedRules,
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'error',
     },
   },
   prettier,

@@ -1,27 +1,28 @@
-function isValidDate(str) {
+import type { FilterInput, FilterErrors, ValidationResult } from '../types/index.js';
+
+function isValidDate(str: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
   return !isNaN(new Date(`${str}T00:00:00`).getTime());
 }
 
-function validateDateField(value, label) {
+function validateDateField(value: string, label: string): string | null {
   if (!value) return `${label} is required.`;
   if (!isValidDate(value)) return `${label} must be a valid date (YYYY-MM-DD).`;
   if (value > new Date().toISOString().slice(0, 10)) return `${label} cannot be in the future.`;
   return null;
 }
 
-function validateMagnitude(value) {
-  if (value === '' || value === null || value === undefined)
-    return 'Minimum magnitude is required.';
+function validateMagnitude(value: string): string | null {
+  if (value === '') return 'Minimum magnitude is required.';
   const mag = Number(value);
   if (isNaN(mag)) return 'Minimum magnitude must be a number.';
   if (mag < 0 || mag > 10) return 'Minimum magnitude must be between 0 and 10.';
   return null;
 }
 
-export function validateFilters(criteria) {
+export function validateFilters(criteria: FilterInput): ValidationResult {
   const { starttime, endtime, minMagnitude } = criteria;
-  const errors = {};
+  const errors: FilterErrors = {};
 
   const startErr = validateDateField(starttime, 'Start date');
   if (startErr) errors.starttime = startErr;

@@ -27,7 +27,7 @@ describe('buildCountUrl', () => {
   });
 });
 
-async function runCountWithTimers(mockFetch) {
+async function runCountWithTimers(mockFetch: typeof fetch) {
   vi.stubGlobal('fetch', mockFetch);
   const p = fetchCount(CRITERIA, vi.fn());
   p.catch(() => {});
@@ -44,7 +44,7 @@ describe('fetchCount — success', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('resolves to a number parsed from plain-text body', async () => {
-    const mock = vi.fn().mockResolvedValue({ ok: true, text: async () => '1234' });
+    const mock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('1234') });
     vi.stubGlobal('fetch', mock);
     const result = await fetchCount(CRITERIA, vi.fn());
     expect(result).toBe(1234);
@@ -52,7 +52,7 @@ describe('fetchCount — success', () => {
   });
 
   it('resolves to 0 when body is "0"', async () => {
-    const mock = vi.fn().mockResolvedValue({ ok: true, text: async () => '0' });
+    const mock = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('0') });
     vi.stubGlobal('fetch', mock);
     const result = await fetchCount(CRITERIA, vi.fn());
     expect(result).toBe(0);
@@ -134,7 +134,7 @@ describe('fetchCount — second attempt success', () => {
     const mock = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500 })
-      .mockResolvedValueOnce({ ok: true, text: async () => '42' });
+      .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('42') });
     vi.stubGlobal('fetch', mock);
     const p = fetchCount(CRITERIA, vi.fn());
     await vi.runAllTimersAsync();

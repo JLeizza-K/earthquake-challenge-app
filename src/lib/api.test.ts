@@ -22,7 +22,7 @@ describe('buildQueryUrl — endtime inclusivity (Safeguard 4)', () => {
   });
 });
 
-async function runWithTimers(mockFetch) {
+async function runWithTimers(mockFetch: typeof fetch) {
   vi.stubGlobal('fetch', mockFetch);
   const p = fetchEarthquakes(CRITERIA, vi.fn());
   p.catch(() => {});
@@ -39,7 +39,7 @@ describe('fetchEarthquakes — success on first attempt', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('resolves immediately without retrying', async () => {
-    const mock = vi.fn().mockResolvedValue({ ok: true, json: async () => MOCK_FC });
+    const mock = vi.fn().mockResolvedValue({ ok: true, json: () => MOCK_FC });
     vi.stubGlobal('fetch', mock);
     const result = await fetchEarthquakes(CRITERIA, vi.fn());
     expect(result).toEqual(MOCK_FC);
@@ -130,7 +130,7 @@ describe('fetchEarthquakes — second attempt success', () => {
     const mock = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500 })
-      .mockResolvedValueOnce({ ok: true, json: async () => MOCK_FC });
+      .mockResolvedValueOnce({ ok: true, json: () => MOCK_FC });
     vi.stubGlobal('fetch', mock);
     const p = fetchEarthquakes(CRITERIA, vi.fn());
     await vi.runAllTimersAsync();

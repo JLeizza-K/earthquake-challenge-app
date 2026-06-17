@@ -1,12 +1,13 @@
 import { getMagnitudeClass } from './magnitudeStyle.js';
 import { MSG_MAGNITUDE_UNAVAILABLE } from './errorMessages.js';
+import type { Earthquake } from '../types/index.js';
 
 const LOCATION_UNKNOWN = 'Location unknown';
 const LABEL_PLACE = 'Place';
 const LABEL_MAGNITUDE = 'Magnitude';
 const LABEL_TIME = 'Time';
 
-const TIME_FORMAT_OPTIONS = {
+const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
@@ -15,11 +16,11 @@ const TIME_FORMAT_OPTIONS = {
   hour12: false,
 };
 
-export function formatEarthquakeTime(timeMs) {
+export function formatEarthquakeTime(timeMs: number): string {
   return new Intl.DateTimeFormat(undefined, TIME_FORMAT_OPTIONS).format(new Date(timeMs));
 }
 
-function buildRow(label, value) {
+function buildRow(label: string, value: string): HTMLParagraphElement {
   const p = document.createElement('p');
   const lbl = document.createElement('strong');
   lbl.textContent = label + ': ';
@@ -30,7 +31,11 @@ function buildRow(label, value) {
   return p;
 }
 
-export function buildPopupContent({ mag, place, time }) {
+export function buildPopupContent({
+  mag,
+  place,
+  time,
+}: Pick<Earthquake, 'mag' | 'place' | 'time'>): HTMLElement {
   const container = document.createElement('div');
   const placeText = place && place.trim() ? place : LOCATION_UNKNOWN;
   const magText = mag === null ? MSG_MAGNITUDE_UNAVAILABLE : `${mag} — ${getMagnitudeClass(mag)}`;

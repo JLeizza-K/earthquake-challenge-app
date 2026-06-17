@@ -1,4 +1,6 @@
-export const CLASS_COLORS = {
+import type { MagnitudeClass, NonNullMagnitudeClass } from '../types/index.js';
+
+export const CLASS_COLORS: Record<NonNullMagnitudeClass, string> = {
   micro: '#FED976',
   minor: '#FEB24C',
   light: '#FD8D3C',
@@ -15,9 +17,9 @@ export const RADIUS_MAX = 52;
 export const POINT_FACTOR = 0.2;
 
 // Alternating [mag, radius] pairs spread into the MapLibre interpolate expression.
-export const RADIUS_ANCHORS = [0, 4, 2, 8, 4, 16, 5, 24, 6, 34, 8, 44, 10, 52];
+export const RADIUS_ANCHORS: number[] = [0, 4, 2, 8, 4, 16, 5, 24, 6, 34, 8, 44, 10, 52];
 
-export function getMagnitudeClass(mag) {
+export function getMagnitudeClass(mag: number | null | undefined): MagnitudeClass {
   if (mag === null || mag === undefined) return 'null-data';
   if (mag < 3.0) return 'micro';
   if (mag < 4.0) return 'minor';
@@ -28,7 +30,7 @@ export function getMagnitudeClass(mag) {
   return 'great';
 }
 
-export function getAuraRadius(mag) {
+export function getAuraRadius(mag: number | null | undefined): number {
   if (mag === null || mag === undefined) return 0;
   const m = Math.max(0, Math.min(10, mag));
   for (let i = 0; i < RADIUS_ANCHORS.length - 2; i += 2) {
@@ -43,7 +45,7 @@ export function getAuraRadius(mag) {
   return RADIUS_MAX;
 }
 
-export function getPointRadius(mag) {
+export function getPointRadius(mag: number | null | undefined): number {
   if (mag === null || mag === undefined) return RADIUS_NULL;
   return getAuraRadius(mag) * POINT_FACTOR;
 }
