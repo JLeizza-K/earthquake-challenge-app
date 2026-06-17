@@ -38,7 +38,7 @@ function toValues(criteria: FilterCriteria): FilterInput {
 
 function renderPanel(bannerProps: BannerRenderProps, formProps: FormRenderProps) {
   return (
-    <div className="filter-panel">
+    <div className="absolute top-4 left-4 z-[1] bg-white rounded-lg p-4 w-[300px] shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
       <StatusBanner {...bannerProps} />
       <FilterForm {...formProps} />
     </div>

@@ -43,35 +43,41 @@ interface FilterFormProps {
 
 function DateField({ label, name, value, error, onChange, disabled }: DateFieldProps) {
   return (
-    <div className="field">
-      <label htmlFor={name}>{label}</label>
+    <div className="flex flex-col gap-1 mb-3">
+      <label htmlFor={name} className="text-[13px] font-semibold">
+        {label}
+      </label>
       <input
         type="date"
         id={name}
+        className="py-1.5 px-2 border border-[#ccc] rounded text-sm"
         value={value}
         onChange={(e) => onChange(name, e.target.value)}
         disabled={disabled}
       />
-      {error && <span className="field-error">{error}</span>}
+      {error && <span className="text-xs text-[#c0392b]">{error}</span>}
     </div>
   );
 }
 
 function MagnitudeField({ value, error, onChange, disabled }: MagnitudeFieldProps) {
   return (
-    <div className="field">
-      <label htmlFor="minMagnitude">Min magnitude</label>
+    <div className="flex flex-col gap-1 mb-3">
+      <label htmlFor="minMagnitude" className="text-[13px] font-semibold">
+        Min magnitude
+      </label>
       <input
         type="number"
         id="minMagnitude"
         min="0"
         max="10"
         step="0.1"
+        className="py-1.5 px-2 border border-[#ccc] rounded text-sm"
         value={value}
         onChange={(e) => onChange('minMagnitude', e.target.value)}
         disabled={disabled}
       />
-      {error && <span className="field-error">{error}</span>}
+      {error && <span className="text-xs text-[#c0392b]">{error}</span>}
     </div>
   );
 }
@@ -123,7 +129,11 @@ export default function FilterForm({
   return (
     <form onSubmit={handleSubmit}>
       <FormFields values={values} errors={errors} onChange={onChange} disabled={disabled} />
-      <button type="submit" disabled={disabled}>
+      <button
+        type="submit"
+        disabled={disabled}
+        className="w-full p-2 bg-[#2c3e50] text-white border-0 rounded text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      >
         Search
       </button>
     </form>
