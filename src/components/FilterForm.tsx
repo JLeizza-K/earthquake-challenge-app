@@ -1,4 +1,47 @@
-function DateField({ label, name, value, error, onChange, disabled }) {
+import type { FormEvent } from 'react';
+import type { FilterInput, FilterErrors } from '../types/index.js';
+
+type ChangeHandler = (name: keyof FilterInput, value: string) => void;
+
+interface DateFieldProps {
+  label: string;
+  name: keyof FilterInput;
+  value: string;
+  error: string | undefined;
+  onChange: ChangeHandler;
+  disabled: boolean;
+}
+
+interface MagnitudeFieldProps {
+  value: string;
+  error: string | undefined;
+  onChange: ChangeHandler;
+  disabled: boolean;
+}
+
+interface DateFieldsProps {
+  values: FilterInput;
+  errors: FilterErrors;
+  onChange: ChangeHandler;
+  disabled: boolean;
+}
+
+interface FormFieldsProps {
+  values: FilterInput;
+  errors: FilterErrors;
+  onChange: ChangeHandler;
+  disabled: boolean;
+}
+
+interface FilterFormProps {
+  values: FilterInput;
+  errors: FilterErrors;
+  onChange: ChangeHandler;
+  onSubmit: (values: FilterInput) => void;
+  disabled: boolean;
+}
+
+function DateField({ label, name, value, error, onChange, disabled }: DateFieldProps) {
   return (
     <div className="field">
       <label htmlFor={name}>{label}</label>
@@ -14,7 +57,7 @@ function DateField({ label, name, value, error, onChange, disabled }) {
   );
 }
 
-function MagnitudeField({ value, error, onChange, disabled }) {
+function MagnitudeField({ value, error, onChange, disabled }: MagnitudeFieldProps) {
   return (
     <div className="field">
       <label htmlFor="minMagnitude">Min magnitude</label>
@@ -33,7 +76,7 @@ function MagnitudeField({ value, error, onChange, disabled }) {
   );
 }
 
-function DateFields({ values, errors, onChange, disabled }) {
+function DateFields({ values, errors, onChange, disabled }: DateFieldsProps) {
   return (
     <>
       <DateField
@@ -56,7 +99,7 @@ function DateFields({ values, errors, onChange, disabled }) {
   );
 }
 
-function FormFields({ values, errors, onChange, disabled }) {
+function FormFields({ values, errors, onChange, disabled }: FormFieldsProps) {
   const shared = { onChange, disabled };
   return (
     <>
@@ -66,8 +109,14 @@ function FormFields({ values, errors, onChange, disabled }) {
   );
 }
 
-export default function FilterForm({ values, errors, onChange, onSubmit, disabled }) {
-  function handleSubmit(e) {
+export default function FilterForm({
+  values,
+  errors,
+  onChange,
+  onSubmit,
+  disabled,
+}: FilterFormProps) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     onSubmit(values);
   }
