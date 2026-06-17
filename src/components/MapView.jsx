@@ -8,6 +8,7 @@ import {
   RADIUS_ANCHORS,
   POINT_FACTOR,
 } from '../lib/magnitudeStyle.js';
+import { buildPopupContent } from '../lib/earthquakePopup.js';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const EMPTY_FC = { type: 'FeatureCollection', features: [] };
@@ -80,16 +81,49 @@ function setupLayer(map) {
   });
 }
 
+function handleClick(map, popupRef, e) {
+  const features = map.queryRenderedFeatures(e.point, { layers: ['earthquakes-halo'] });
+  if (features.length > 0) {
+    const feature = features[0];
+    const coords = feature.geometry.coordinates;
+    if (popupRef.current) popupRef.current.remove();
+    map.easeTo({ center: coords });
+    popupRef.current = new maplibregl.Popup()
+      .setLngLat(coords)
+      .setDOMContent(buildPopupContent(feature.properties))
+      .addTo(map);
+  } else {
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+  }
+}
+
+function closePopup(popupRef) {
+  if (popupRef.current) {
+    popupRef.current.remove();
+    popupRef.current = null;
+  }
+}
+
 function applyEarthquakes(map, earthquakes) {
   if (!map || !map.loaded() || !map.getSource('earthquakes')) return;
   const fc = earthquakes?.length > 0 ? toFeatureCollection(earthquakes) : EMPTY_FC;
   map.getSource('earthquakes').setData(fc);
 }
 
+function initMap(map, earthquakesRef, popupRef) {
+  setupLayer(map);
+  applyEarthquakes(map, earthquakesRef.current);
+  map.on('click', (e) => handleClick(map, popupRef, e));
+}
+
 export default function MapView({ earthquakes }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const earthquakesRef = useRef(earthquakes);
+  const popupRef = useRef(null);
 
   useEffect(() => {
     earthquakesRef.current = earthquakes;
@@ -99,17 +133,16 @@ export default function MapView({ earthquakes }) {
     if (mapRef.current) return;
     const map = new maplibregl.Map({ container: containerRef.current, style: STYLE_URL });
     mapRef.current = map;
-    map.on('load', () => {
-      setupLayer(map);
-      applyEarthquakes(map, earthquakesRef.current);
-    });
+    map.on('load', () => initMap(map, earthquakesRef, popupRef));
     return () => {
       map.remove();
       mapRef.current = null;
+      popupRef.current = null;
     };
   }, []);
 
   useEffect(() => {
+    closePopup(popupRef);
     applyEarthquakes(mapRef.current, earthquakes);
   }, [earthquakes]);
 

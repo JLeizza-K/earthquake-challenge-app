@@ -36,7 +36,10 @@ pnpm format      # Prettier
 - Fetch state as a state machine: a single "status" field with values `idle | loading | success | empty | error`.
 - The map renders with a circle layer (source + layer), NOT DOM markers.
 - The map is initialized ONCE (useRef to the container + useEffect). Do not recreate the map on every render.
-- Popups use `setText`, not `setHTML` (XSS safety).
+- Popups may use HTML structure for formatting, but API-sourced or user-derived data
+  must be inserted via DOM `textContent` (or equivalent escaping), never interpolated
+  into a raw HTML string (`innerHTML` / `setHTML`). The goal is XSS safety, not avoiding
+  HTML.
 
 ## Error handling
 
