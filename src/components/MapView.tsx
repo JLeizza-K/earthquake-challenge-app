@@ -1,21 +1,22 @@
 import { useEffect, useRef } from 'react';
 import maplibregl, {
   Map as MapLibreMap,
-  MapGeoJSONFeature,
   Popup,
   GeoJSONSource,
-  type MapMouseEvent,
+  type ExpressionSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
-  CLASS_COLORS,
-  NULL_COLOR,
-  RADIUS_NULL,
-  RADIUS_ANCHORS,
-  POINT_FACTOR,
-} from '../lib/magnitudeStyle.js';
-import { buildPopupContent } from '../lib/earthquakePopup.js';
-import type { ExpressionSpecification } from 'maplibre-gl';
+  buildColorExpr,
+  buildAuraRadiusExpr,
+  buildPointRadiusExpr,
+  buildClusterColorExpr,
+  buildClusterSizeExpr,
+  buildClusterProperties,
+} from '../lib/mapExpressions.js';
+import { closePopup, handleClick, handleCardClick } from '../lib/mapClickHandlers.js';
+import { useClusterPanel } from '../hooks/useClusterPanel.js';
+import ClusterPanel from './ClusterPanel.js';
 import type { Earthquake } from '../types/index.js';
 
 interface MapViewProps {
@@ -23,40 +24,7 @@ interface MapViewProps {
 }
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
-const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] as const };
-
-function buildColorExpr(): ExpressionSpecification {
-  return [
-    'case',
-    ['==', ['get', 'mag'], null],
-    NULL_COLOR,
-    ['<', ['get', 'mag'], 3.0],
-    CLASS_COLORS.micro,
-    ['<', ['get', 'mag'], 4.0],
-    CLASS_COLORS.minor,
-    ['<', ['get', 'mag'], 5.0],
-    CLASS_COLORS.light,
-    ['<', ['get', 'mag'], 6.0],
-    CLASS_COLORS.moderate,
-    ['<', ['get', 'mag'], 7.0],
-    CLASS_COLORS.strong,
-    ['<', ['get', 'mag'], 8.0],
-    CLASS_COLORS.major,
-    CLASS_COLORS.great,
-  ];
-}
-
-function buildCurveExpr(): ExpressionSpecification {
-  return ['interpolate', ['linear'], ['get', 'mag'], ...RADIUS_ANCHORS];
-}
-
-function buildAuraRadiusExpr(): ExpressionSpecification {
-  return ['case', ['==', ['get', 'mag'], null], 0, buildCurveExpr()];
-}
-
-function buildPointRadiusExpr(): ExpressionSpecification {
-  return ['case', ['==', ['get', 'mag'], null], RADIUS_NULL, ['*', buildCurveExpr(), POINT_FACTOR]];
-}
+const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 
 function toFeatureCollection(earthquakes: Earthquake[]) {
   return {
@@ -69,12 +37,24 @@ function toFeatureCollection(earthquakes: Earthquake[]) {
   };
 }
 
+function setupSource(map: MapLibreMap): void {
+  map.addSource('earthquakes', {
+    type: 'geojson',
+    data: EMPTY_FC,
+    cluster: true,
+    clusterRadius: 38,
+    clusterMaxZoom: 14,
+    clusterProperties: buildClusterProperties(),
+  });
+}
+
 function setupLayer(map: MapLibreMap) {
-  map.addSource('earthquakes', { type: 'geojson', data: EMPTY_FC });
+  setupSource(map);
   map.addLayer({
     id: 'earthquakes-halo',
     type: 'circle',
     source: 'earthquakes',
+    filter: ['!', ['has', 'point_count']] as ExpressionSpecification,
     paint: {
       'circle-color': buildColorExpr(),
       'circle-radius': buildAuraRadiusExpr(),
@@ -85,6 +65,7 @@ function setupLayer(map: MapLibreMap) {
     id: 'earthquakes',
     type: 'circle',
     source: 'earthquakes',
+    filter: ['!', ['has', 'point_count']] as ExpressionSpecification,
     paint: {
       'circle-color': buildColorExpr(),
       'circle-radius': buildPointRadiusExpr(),
@@ -93,114 +74,109 @@ function setupLayer(map: MapLibreMap) {
   });
 }
 
-interface EqProps {
-  mag: number | null;
-  place: string;
-  time: number;
-}
-
-function isEqProps(p: unknown): p is EqProps {
-  if (typeof p !== 'object' || p === null) return false;
-  const obj = p as Record<string, unknown>;
-  return (
-    (typeof obj['mag'] === 'number' || obj['mag'] === null) &&
-    typeof obj['place'] === 'string' &&
-    typeof obj['time'] === 'number'
-  );
-}
-
-function openPopup(
-  map: MapLibreMap,
-  popupRef: { current: Popup | null },
-  feature: MapGeoJSONFeature,
-): void {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  if (!feature.geometry || feature.geometry.type !== 'Point') return;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-  const coords = feature.geometry.coordinates;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const [lng, lat] = coords;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const lngLat: [number, number] = [lng, lat];
-  if (popupRef.current) popupRef.current.remove();
-  map.easeTo({ center: lngLat });
-  if (!isEqProps(feature.properties)) return;
-  popupRef.current = new maplibregl.Popup()
-    .setLngLat(lngLat)
-    .setDOMContent(
-      buildPopupContent({
-        mag: feature.properties.mag,
-        place: feature.properties.place,
-        time: feature.properties.time,
-      }),
-    )
-    .addTo(map);
-}
-
-function handleClick(
-  map: MapLibreMap,
-  popupRef: { current: Popup | null },
-  e: MapMouseEvent,
-): void {
-  const features = map.queryRenderedFeatures(e.point, { layers: ['earthquakes-halo'] });
-  if (features.length > 0) {
-    openPopup(map, popupRef, features[0]);
-  } else {
-    closePopup(popupRef);
-  }
-}
-
-function closePopup(popupRef: { current: Popup | null }): void {
-  if (popupRef.current) {
-    popupRef.current.remove();
-    popupRef.current = null;
-  }
+function setupClusterLayers(map: MapLibreMap): void {
+  map.addLayer({
+    id: 'cluster-circle',
+    type: 'circle',
+    source: 'earthquakes',
+    filter: ['has', 'point_count'] as ExpressionSpecification,
+    paint: {
+      'circle-color': buildClusterColorExpr(),
+      'circle-radius': buildClusterSizeExpr(),
+    },
+  });
+  map.addLayer({
+    id: 'cluster-count',
+    type: 'symbol',
+    source: 'earthquakes',
+    filter: ['has', 'point_count'] as ExpressionSpecification,
+    layout: { 'text-field': '{point_count_abbreviated}', 'text-size': 13 },
+    paint: { 'text-color': '#ffffff' },
+  });
 }
 
 function applyEarthquakes(map: MapLibreMap | null, earthquakes: Earthquake[]): void {
   if (!map || !map.loaded()) return;
   const src = map.getSource('earthquakes');
   if (!(src instanceof GeoJSONSource)) return;
-  const fc = earthquakes.length > 0 ? toFeatureCollection(earthquakes) : EMPTY_FC;
-  src.setData(fc);
+  src.setData(earthquakes.length > 0 ? toFeatureCollection(earthquakes) : EMPTY_FC);
+}
+
+function applyDataChange(
+  earthquakesRef: { current: Earthquake[] },
+  resetPanel: () => void,
+  popupRef: { current: Popup | null },
+  mapRef: { current: MapLibreMap | null },
+  earthquakes: Earthquake[],
+): void {
+  earthquakesRef.current = earthquakes;
+  resetPanel();
+  closePopup(popupRef);
+  applyEarthquakes(mapRef.current, earthquakes);
 }
 
 function initMap(
   map: MapLibreMap,
   earthquakesRef: { current: Earthquake[] },
   popupRef: { current: Popup | null },
+  onCluster: (src: GeoJSONSource, clusterId: number) => void,
 ): void {
   setupLayer(map);
+  setupClusterLayers(map);
   applyEarthquakes(map, earthquakesRef.current);
-  map.on('click', (e) => handleClick(map, popupRef, e));
+  map.on('click', (e) => handleClick(map, popupRef, onCluster, e));
 }
 
-export default function MapView({ earthquakes }: MapViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+function useInitMap(
+  containerRef: { current: HTMLDivElement | null },
+  earthquakesRef: { current: Earthquake[] },
+  popupRef: { current: Popup | null },
+  loadClusterLeaves: (src: GeoJSONSource, clusterId: number) => void,
+) {
   const mapRef = useRef<MapLibreMap | null>(null);
-  const earthquakesRef = useRef<Earthquake[]>(earthquakes);
-  const popupRef = useRef<Popup | null>(null);
+  const loadClusterLeavesRef = useRef(loadClusterLeaves);
 
   useEffect(() => {
-    earthquakesRef.current = earthquakes;
-  }, [earthquakes]);
+    loadClusterLeavesRef.current = loadClusterLeaves;
+  }, [loadClusterLeaves]);
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
     const map = new maplibregl.Map({ container: containerRef.current, style: STYLE_URL });
     mapRef.current = map;
-    map.on('load', () => initMap(map, earthquakesRef, popupRef));
+    map.on('load', () => initMap(map, earthquakesRef, popupRef, loadClusterLeavesRef.current));
     return () => {
       map.remove();
       mapRef.current = null;
       popupRef.current = null;
     };
-  }, []);
+  }, [containerRef, earthquakesRef, popupRef]);
+
+  return mapRef;
+}
+
+export default function MapView({ earthquakes }: MapViewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const earthquakesRef = useRef<Earthquake[]>(earthquakes);
+  const popupRef = useRef<Popup | null>(null);
+  const { panelLeaves, setPanelLeaves, loadClusterLeaves, resetPanel } = useClusterPanel();
+  const mapRef = useInitMap(containerRef, earthquakesRef, popupRef, loadClusterLeaves);
 
   useEffect(() => {
-    closePopup(popupRef);
-    applyEarthquakes(mapRef.current, earthquakes);
-  }, [earthquakes]);
+    applyDataChange(earthquakesRef, resetPanel, popupRef, mapRef, earthquakes);
+  }, [earthquakes, mapRef]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100vh' }} />;
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      <ClusterPanel
+        leaves={panelLeaves}
+        onClose={() => setPanelLeaves(null)}
+        onCardClick={(eq) => {
+          if (!mapRef.current) return;
+          handleCardClick(mapRef.current, popupRef, () => setPanelLeaves(null), eq);
+        }}
+      />
+    </div>
+  );
 }

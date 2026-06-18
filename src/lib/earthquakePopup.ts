@@ -2,7 +2,7 @@ import { getMagnitudeClass } from './magnitudeStyle.js';
 import { MSG_MAGNITUDE_UNAVAILABLE } from './errorMessages.js';
 import type { Earthquake } from '../types/index.js';
 
-const LOCATION_UNKNOWN = 'Location unknown';
+export const LOCATION_UNKNOWN = 'Location unknown';
 const LABEL_PLACE = 'Place';
 const LABEL_MAGNITUDE = 'Magnitude';
 const LABEL_TIME = 'Time';
