@@ -9,13 +9,11 @@ interface FilterPanelProps {
   errors: FilterErrors;
   errorMessage: string | null;
   onSubmit: (raw: FilterInput) => void;
-  onRetry: () => void;
 }
 
 interface BannerRenderProps {
   status: FetchStatus;
   errorMessage: string | null;
-  onRetry: () => void;
 }
 
 interface FormRenderProps {
@@ -46,7 +44,7 @@ function renderPanel(bannerProps: BannerRenderProps, formProps: FormRenderProps)
 }
 
 export default function FilterPanel(props: FilterPanelProps) {
-  const { status, criteria, errors, errorMessage, onSubmit, onRetry } = props;
+  const { status, criteria, errors, errorMessage, onSubmit } = props;
   const [values, setValues] = useState<FilterInput>(EMPTY_VALUES);
   const [prevCriteria, setPrevCriteria] = useState<FilterCriteria | null>(null);
 
@@ -61,7 +59,7 @@ export default function FilterPanel(props: FilterPanelProps) {
   }
 
   return renderPanel(
-    { status, errorMessage, onRetry },
+    { status, errorMessage },
     { values, errors, onChange: handleChange, onSubmit, disabled: status === 'loading' },
   );
 }
