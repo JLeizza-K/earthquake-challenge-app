@@ -16,6 +16,7 @@ import {
   buildClusterProperties,
 } from '../lib/mapExpressions.js';
 import { buildPopupContent } from '../lib/earthquakePopup.js';
+import { isEqProps } from '../lib/clusterLeaves.js';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import type { Earthquake } from '../types/index.js';
 
@@ -24,7 +25,7 @@ interface MapViewProps {
 }
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
-const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] as const };
+const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 
 function toFeatureCollection(earthquakes: Earthquake[]) {
   return {
@@ -95,34 +96,14 @@ function setupClusterLayers(map: MapLibreMap): void {
   });
 }
 
-interface EqProps {
-  mag: number | null;
-  place: string;
-  time: number;
-}
-
-function isEqProps(p: unknown): p is EqProps {
-  if (typeof p !== 'object' || p === null) return false;
-  const obj = p as Record<string, unknown>;
-  return (
-    (typeof obj['mag'] === 'number' || obj['mag'] === null) &&
-    typeof obj['place'] === 'string' &&
-    typeof obj['time'] === 'number'
-  );
-}
-
 function openPopup(
   map: MapLibreMap,
   popupRef: { current: Popup | null },
   feature: MapGeoJSONFeature,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if (!feature.geometry || feature.geometry.type !== 'Point') return;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
   const coords = feature.geometry.coordinates;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const [lng, lat] = coords;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const lngLat: [number, number] = [lng, lat];
   if (popupRef.current) popupRef.current.remove();
   map.easeTo({ center: lngLat });
