@@ -230,7 +230,6 @@ Visible on narrow (always) and on medium only when the filter body is hidden (cl
 
 Responsive behaviour is inherently visual and depends on viewport size. Automated tests:
 
-- **`mapClickHandlers.test.ts`** — unit test for conditional card-click guard: mock `window.innerWidth` to values below and above 1024; verify `onClosePanel` is called on narrow/medium and not called on wide.
 - **`ClusterPanelOpenContext` behaviour** — minimal unit test verifying the context provides the expected boolean and updates propagate.
 
 **Interaction-verified (not automated):** AC1, AC2, AC3, AC4, AC5 (viewport-dependent layout). Manual testing across three viewport sizes in browser dev tools.
