@@ -8,12 +8,13 @@ import maplibregl, {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
-  CLASS_COLORS,
-  NULL_COLOR,
-  RADIUS_NULL,
-  RADIUS_ANCHORS,
-  POINT_FACTOR,
-} from '../lib/magnitudeStyle.js';
+  buildColorExpr,
+  buildAuraRadiusExpr,
+  buildPointRadiusExpr,
+  buildClusterColorExpr,
+  buildClusterSizeExpr,
+  buildClusterProperties,
+} from '../lib/mapExpressions.js';
 import { buildPopupContent } from '../lib/earthquakePopup.js';
 import type { ExpressionSpecification } from 'maplibre-gl';
 import type { Earthquake } from '../types/index.js';
@@ -24,39 +25,6 @@ interface MapViewProps {
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] as const };
-
-function buildColorExpr(): ExpressionSpecification {
-  return [
-    'case',
-    ['==', ['get', 'mag'], null],
-    NULL_COLOR,
-    ['<', ['get', 'mag'], 3.0],
-    CLASS_COLORS.micro,
-    ['<', ['get', 'mag'], 4.0],
-    CLASS_COLORS.minor,
-    ['<', ['get', 'mag'], 5.0],
-    CLASS_COLORS.light,
-    ['<', ['get', 'mag'], 6.0],
-    CLASS_COLORS.moderate,
-    ['<', ['get', 'mag'], 7.0],
-    CLASS_COLORS.strong,
-    ['<', ['get', 'mag'], 8.0],
-    CLASS_COLORS.major,
-    CLASS_COLORS.great,
-  ];
-}
-
-function buildCurveExpr(): ExpressionSpecification {
-  return ['interpolate', ['linear'], ['get', 'mag'], ...RADIUS_ANCHORS];
-}
-
-function buildAuraRadiusExpr(): ExpressionSpecification {
-  return ['case', ['==', ['get', 'mag'], null], 0, buildCurveExpr()];
-}
-
-function buildPointRadiusExpr(): ExpressionSpecification {
-  return ['case', ['==', ['get', 'mag'], null], RADIUS_NULL, ['*', buildCurveExpr(), POINT_FACTOR]];
-}
 
 function toFeatureCollection(earthquakes: Earthquake[]) {
   return {
@@ -69,12 +37,24 @@ function toFeatureCollection(earthquakes: Earthquake[]) {
   };
 }
 
+function setupSource(map: MapLibreMap): void {
+  map.addSource('earthquakes', {
+    type: 'geojson',
+    data: EMPTY_FC,
+    cluster: true,
+    clusterRadius: 38,
+    clusterMaxZoom: 14,
+    clusterProperties: buildClusterProperties(),
+  });
+}
+
 function setupLayer(map: MapLibreMap) {
-  map.addSource('earthquakes', { type: 'geojson', data: EMPTY_FC });
+  setupSource(map);
   map.addLayer({
     id: 'earthquakes-halo',
     type: 'circle',
     source: 'earthquakes',
+    filter: ['!', ['has', 'point_count']] as ExpressionSpecification,
     paint: {
       'circle-color': buildColorExpr(),
       'circle-radius': buildAuraRadiusExpr(),
@@ -85,11 +65,33 @@ function setupLayer(map: MapLibreMap) {
     id: 'earthquakes',
     type: 'circle',
     source: 'earthquakes',
+    filter: ['!', ['has', 'point_count']] as ExpressionSpecification,
     paint: {
       'circle-color': buildColorExpr(),
       'circle-radius': buildPointRadiusExpr(),
       'circle-opacity': 0.8,
     },
+  });
+}
+
+function setupClusterLayers(map: MapLibreMap): void {
+  map.addLayer({
+    id: 'cluster-circle',
+    type: 'circle',
+    source: 'earthquakes',
+    filter: ['has', 'point_count'] as ExpressionSpecification,
+    paint: {
+      'circle-color': buildClusterColorExpr(),
+      'circle-radius': buildClusterSizeExpr(),
+    },
+  });
+  map.addLayer({
+    id: 'cluster-count',
+    type: 'symbol',
+    source: 'earthquakes',
+    filter: ['has', 'point_count'] as ExpressionSpecification,
+    layout: { 'text-field': '{point_count_abbreviated}', 'text-size': 13 },
+    paint: { 'text-color': '#ffffff' },
   });
 }
 
@@ -171,6 +173,7 @@ function initMap(
   popupRef: { current: Popup | null },
 ): void {
   setupLayer(map);
+  setupClusterLayers(map);
   applyEarthquakes(map, earthquakesRef.current);
   map.on('click', (e) => handleClick(map, popupRef, e));
 }
