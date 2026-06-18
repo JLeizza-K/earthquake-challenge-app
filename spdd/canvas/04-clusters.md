@@ -73,7 +73,7 @@ generationRef: useRef<number>       // incremented on each cluster click and on 
 ```
 
 `generationRef` is not React state — it does not trigger re-renders. It is checked inside
-the `getClusterLeaves` callback before calling `setPanelLeaves`.
+the `.then()` handler before calling `setPanelLeaves`.
 
 ---
 
@@ -129,8 +129,8 @@ Single handler; no click-outside listener; no additional flag.
 ### Async leaves flow and generation guard (R4, OQ4)
 
 On a cluster click the handler increments `generationRef.current` and captures the current
-value. `source.getClusterLeaves(clusterId, 500, 0, callback)` is called. Inside the callback:
-if `generationRef.current !== capturedGen`, the response is discarded. Otherwise leaves are
+value. `source.getClusterLeaves(clusterId, 500, 0)` returns a Promise; the generation guard
+is checked inside the `.then()`: if `generationRef.current !== capturedGen`, the response is discarded. Otherwise leaves are
 validated with `isEqProps`, mapped to `Earthquake[]`, and `setPanelLeaves(leaves)` opens
 the panel.
 
@@ -271,7 +271,7 @@ These are non-negotiable. No implementation may bypass them.
    is discarded.
 
 3. **Generation guard is always checked before applying async results.** The captured value at
-   call time is compared to `generationRef.current` inside the callback. A stale response never
+   call time is compared to `generationRef.current` inside the `.then()` handler. A stale response never
    calls `setPanelLeaves`.
 
 4. **No click-outside mechanism.** Panel dismissal happens only via the close control, a new
