@@ -35,3 +35,11 @@ export function mapLeavesToEarthquakes(rawLeaves: Feature[]): Earthquake[] {
     .map(toEarthquake)
     .filter((eq): eq is Earthquake => eq !== null);
 }
+
+export type ClusterFeatureProps = { point_count: number; cluster_id: number };
+
+export function isClusterFeatureProps(p: unknown): p is ClusterFeatureProps {
+  if (typeof p !== 'object' || p === null) return false;
+  const obj = p as Record<string, unknown>;
+  return typeof obj['cluster_id'] === 'number' && typeof obj['point_count'] === 'number';
+}
