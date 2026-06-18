@@ -1,16 +1,61 @@
-# React + Vite
+# Earthquake Map
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interactive map of recent earthquakes using data from the USGS Earthquake
+Catalog. Filter by date range and magnitude, visualise severity through size
+and colour, and click any event for details.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **React 19** + **Vite** — frontend framework and build tool
+- **MapLibre GL JS** — map rendering (circle layers, no DOM markers)
+- **Tailwind CSS v4** — utility-first styling
+- **TypeScript** — type safety across the codebase
+- **pnpm** — package manager
+- **nginx** — production serving (via Docker)
 
-## React Compiler
+## Methodology
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+This project follows **Spec-Driven Development (SPDD)**. Every feature starts
+as a user story, goes through an analysis phase, and is specified in a canvas
+before any code is written. Artifacts live in `spdd/`:
 
-## Expanding the ESLint configuration
+| Folder      | Contents                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| `stories/`  | User stories in the "As a… I want… So that…" format, with acceptance criteria                    |
+| `analysis/` | Domain exploration, key rules, risks, and edge cases for each story                              |
+| `canvas/`   | Executable specification: what we deliver, entities, approach, operations, norms, and safeguards |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Three stories have been completed: filter by date and magnitude (Story 1),
+magnitude-based visual encoding (Story 2), and earthquake detail popups (Story 3).
+
+## Quick start (local)
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Open http://localhost:5173.
+
+## Docker
+
+```bash
+docker build -t earthquake-challenge .
+docker run -p 8080:80 earthquake-challenge
+```
+
+Open http://localhost:8080.
+
+Multi-stage build (Node → nginx:alpine). No local dependencies required.
+
+## Available scripts
+
+| Command          | Description                  |
+| ---------------- | ---------------------------- |
+| `pnpm dev`       | Development server (Vite)    |
+| `pnpm build`     | Production build             |
+| `pnpm preview`   | Preview the production build |
+| `pnpm lint`      | ESLint                       |
+| `pnpm format`    | Prettier                     |
+| `pnpm test`      | Vitest (unit tests)          |
+| `pnpm typecheck` | TypeScript type checking     |
