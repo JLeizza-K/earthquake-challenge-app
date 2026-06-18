@@ -1,14 +1,8 @@
 import type { FetchStatus } from '../types/index.js';
 
-interface ErrorMessageProps {
-  message: string | null;
-  onRetry: () => void;
-}
-
 interface StatusBannerProps {
   status: FetchStatus;
   errorMessage: string | null;
-  onRetry: () => void;
 }
 
 function LoadingOverlay() {
@@ -19,22 +13,15 @@ function LoadingOverlay() {
   );
 }
 
-function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
+function ErrorMessage({ message }: { message: string | null }) {
   return (
     <div className="mb-3 p-2 rounded text-[13px] bg-[#fdedec] text-[#922b21]">
       <p className="mb-2">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="py-1 px-2.5 bg-[#922b21] text-white border-0 rounded cursor-pointer text-xs"
-      >
-        Try again
-      </button>
     </div>
   );
 }
 
-export default function StatusBanner({ status, errorMessage, onRetry }: StatusBannerProps) {
+export default function StatusBanner({ status, errorMessage }: StatusBannerProps) {
   if (status === 'loading') return <LoadingOverlay />;
   if (status === 'empty') {
     return (
@@ -44,7 +31,7 @@ export default function StatusBanner({ status, errorMessage, onRetry }: StatusBa
     );
   }
   if (status === 'error') {
-    return <ErrorMessage message={errorMessage} onRetry={onRetry} />;
+    return <ErrorMessage message={errorMessage} />;
   }
   return null;
 }
