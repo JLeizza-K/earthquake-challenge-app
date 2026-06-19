@@ -25,8 +25,10 @@ before any code is written. Artifacts live in `spdd/`:
 | `analysis/` | Domain exploration, key rules, risks, and edge cases for each story                              |
 | `canvas/`   | Executable specification: what we deliver, entities, approach, operations, norms, and safeguards |
 
-Three stories have been completed: filter by date and magnitude (Story 1),
-magnitude-based visual encoding (Story 2), and earthquake detail popups (Story 3).
+Five stories have been completed: filter by date and magnitude (Story 1),
+magnitude-based visual encoding (Story 2), earthquake detail popups
+(Story 3), cluster panel with leaf browsing (Story 4), and responsive
+layout across narrow, medium, and wide viewports (Story 5).
 
 ## Quick start (local)
 
@@ -48,14 +50,63 @@ Open http://localhost:8080.
 
 Multi-stage build (Node → nginx:alpine). No local dependencies required.
 
+Or using the pnpm scripts:
+
+```bash
+pnpm docker:up    # build and start
+pnpm docker:down  # stop and remove
+```
+
+## Running tests
+
+```bash
+pnpm test          # run all tests once
+pnpm test:watch    # watch mode — re-runs on changes
+```
+
+Tests use Vitest (https://vitest.dev/) with jsdom for component tests.
+Every feature ships with unit tests covering its acceptance criteria.
+Pure logic (validation, mappers, URL building) is tested independently
+of React.
+
 ## Available scripts
 
-| Command          | Description                  |
-| ---------------- | ---------------------------- |
-| `pnpm dev`       | Development server (Vite)    |
-| `pnpm build`     | Production build             |
-| `pnpm preview`   | Preview the production build |
-| `pnpm lint`      | ESLint                       |
-| `pnpm format`    | Prettier                     |
-| `pnpm test`      | Vitest (unit tests)          |
-| `pnpm typecheck` | TypeScript type checking     |
+| Command               | Description                      |
+| --------------------- | -------------------------------- |
+| `pnpm dev`            | Development server (Vite)        |
+| `pnpm build`          | Production build                 |
+| `pnpm preview`        | Preview the production build     |
+| `pnpm lint`           | ESLint                           |
+| `pnpm format`         | Prettier                         |
+| `pnpm test`           | Vitest (unit tests)              |
+| `pnpm typecheck`      | TypeScript type checking         |
+| `pnpm test:watch`     | Vitest in watch mode             |
+| `pnpm format --check` | Prettier check (no write)        |
+| `pnpm docker:up`      | Build Docker image and start     |
+| `pnpm docker:down`    | Stop and remove Docker container |
+
+## Known limitations & roadmap
+
+### UX
+
+- **Zoom on cluster card click** — clicking a card in the cluster panel
+  should zoom the map until the earthquake separates from its cluster.
+  Currently it opens the popup without zooming.
+- **Date picker year limits** — the calendar input accepts any year;
+  adding a lower bound of 1900 and an upper bound of the current year
+  would prevent queries that return no results by definition.
+- **Zoom controls** — no on-screen zoom buttons; users rely on scroll
+  or pinch gestures only.
+
+### Performance
+
+- **React.memo** — high-frequency re-render paths (ClusterPanel cards,
+  FilterForm fields) have not been memoised. Adding memo wrappers is
+  recommended.
+
+### Visual
+
+- **Dark mode** — Tailwind's `dark:` prefix would cover UI components,
+  but the map itself requires a separate dark style for MapLibre layers
+  (or CSS filters on the canvas element). Both pieces are needed for a
+  complete dark mode.

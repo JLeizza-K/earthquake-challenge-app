@@ -143,7 +143,12 @@ function useInitMap(
   }, [loadClusterLeaves]);
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
-    const opts = { container: containerRef.current, style: STYLE_URL, renderWorldCopies: false };
+    const opts = {
+      container: containerRef.current,
+      style: STYLE_URL,
+      renderWorldCopies: false,
+      dragRotate: false,
+    };
     const map = new maplibregl.Map(opts);
     mapRef.current = map;
     map.on('load', () => initMap(map, earthquakesRef, popupRef, loadClusterLeavesRef.current));
