@@ -106,14 +106,6 @@ export function useEarthquakeQuery() {
     void runQuery(criteria, id, reqId, setState);
   }
 
-  function retry(): void {
-    const { criteria } = state;
-    if (!criteria) return;
-    const id = ++reqId.current;
-    setState(loadingState(criteria));
-    void runQuery(criteria, id, reqId, setState);
-  }
-
   const { status, earthquakes, criteria, errors, errorMessage } = state;
-  return { status, earthquakes, criteria, errors, errorMessage, submit, retry };
+  return { status, earthquakes, criteria, errors, errorMessage, submit };
 }

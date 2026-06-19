@@ -1,5 +1,4 @@
-import StatusBanner from './StatusBanner.jsx';
-import FilterForm from './FilterForm.jsx';
+import FilterBody from './FilterBody.jsx';
 import type { FetchStatus, FilterErrors, FilterInput } from '../types/index.js';
 
 interface FilterDrawerProps {
@@ -26,8 +25,7 @@ export default function FilterDrawer({ status, errorMessage, fp, onClose }: Filt
       >
         ✕
       </button>
-      <StatusBanner status={status} errorMessage={errorMessage} />
-      <FilterForm {...fp} />
+      <FilterBody status={status} errorMessage={errorMessage} fp={fp} />
     </div>
   );
 }

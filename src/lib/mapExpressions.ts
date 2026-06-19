@@ -7,25 +7,29 @@ import {
   POINT_FACTOR,
 } from './magnitudeStyle.js';
 
-export function buildColorExpr(): ExpressionSpecification {
+function buildColorExprFor(field: 'mag' | 'max_mag'): ExpressionSpecification {
   return [
     'case',
-    ['==', ['get', 'mag'], null],
+    ['==', ['get', field], null],
     NULL_COLOR,
-    ['<', ['get', 'mag'], 3.0],
+    ['<', ['get', field], 3.0],
     CLASS_COLORS.micro,
-    ['<', ['get', 'mag'], 4.0],
+    ['<', ['get', field], 4.0],
     CLASS_COLORS.minor,
-    ['<', ['get', 'mag'], 5.0],
+    ['<', ['get', field], 5.0],
     CLASS_COLORS.light,
-    ['<', ['get', 'mag'], 6.0],
+    ['<', ['get', field], 6.0],
     CLASS_COLORS.moderate,
-    ['<', ['get', 'mag'], 7.0],
+    ['<', ['get', field], 7.0],
     CLASS_COLORS.strong,
-    ['<', ['get', 'mag'], 8.0],
+    ['<', ['get', field], 8.0],
     CLASS_COLORS.major,
     CLASS_COLORS.great,
   ];
+}
+
+export function buildColorExpr(): ExpressionSpecification {
+  return buildColorExprFor('mag');
 }
 
 export function buildCurveExpr(): ExpressionSpecification {
@@ -41,24 +45,7 @@ export function buildPointRadiusExpr(): ExpressionSpecification {
 }
 
 export function buildClusterColorExpr(): ExpressionSpecification {
-  return [
-    'case',
-    ['==', ['get', 'max_mag'], null],
-    NULL_COLOR,
-    ['<', ['get', 'max_mag'], 3.0],
-    CLASS_COLORS.micro,
-    ['<', ['get', 'max_mag'], 4.0],
-    CLASS_COLORS.minor,
-    ['<', ['get', 'max_mag'], 5.0],
-    CLASS_COLORS.light,
-    ['<', ['get', 'max_mag'], 6.0],
-    CLASS_COLORS.moderate,
-    ['<', ['get', 'max_mag'], 7.0],
-    CLASS_COLORS.strong,
-    ['<', ['get', 'max_mag'], 8.0],
-    CLASS_COLORS.major,
-    CLASS_COLORS.great,
-  ];
+  return buildColorExprFor('max_mag');
 }
 
 export function buildClusterSizeExpr(): ExpressionSpecification {

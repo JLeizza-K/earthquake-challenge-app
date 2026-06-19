@@ -33,28 +33,60 @@ function toValues(criteria: FilterCriteria): FilterInput {
   };
 }
 
+function useFilterPanelState(
+  criteria: FilterCriteria | null,
+  status: FetchStatus,
+  isClusterOpen: boolean,
+) {
+  const [values, setValues] = useState<FilterInput>(EMPTY_VALUES);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  useEffect(() => {
+    if (criteria) setValues(toValues(criteria));
+  }, [criteria]);
+  useEffect(() => {
+    if (isClusterOpen) setIsDrawerOpen(false);
+  }, [isClusterOpen]);
+  useEffect(() => {
+    if (isTerminal(status)) setIsDrawerOpen(false);
+  }, [status]);
+  return { values, setValues, isDrawerOpen, setIsDrawerOpen };
+}
+
 export default function FilterPanel(props: FilterPanelProps) {
   const { status, criteria, errors, errorMessage, onSubmit, onCloseClusterPanel } = props;
-  const [values, setValues] = useState<FilterInput>(EMPTY_VALUES);
-  const [prevCriteria, setPrevCriteria] = useState<FilterCriteria | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const isClusterOpen = useContext(ClusterPanelOpenContext);
-  if (criteria !== prevCriteria) setPrevCriteria(criteria);
-  if (criteria !== prevCriteria && criteria) setValues(toValues(criteria));
-  const close = () => setIsDrawerOpen(false);
-  useEffect(() => void (isClusterOpen && queueMicrotask(close)), [isClusterOpen]);
-  useEffect(() => void (isTerminal(status) && queueMicrotask(close)), [status]);
-  // prettier-ignore
-  const v = getViewport(), b = v.isMedium && isClusterOpen ? 'invisible pointer-events-none' : '';
-  const ch = (f: keyof FilterInput, vl: string) => setValues((p) => ({ ...p, [f]: vl }));
-  const fp = { values, errors, onChange: ch, onSubmit, disabled: status === 'loading' };
-  const toggle = () => onCloseClusterPanel?.() || setIsDrawerOpen((p) => !p);
+  const { values, setValues, isDrawerOpen, setIsDrawerOpen } = useFilterPanelState(
+    criteria,
+    status,
+    isClusterOpen,
+  );
+  const closeDrawer = () => setIsDrawerOpen(false);
+  const v = getViewport();
+  const hide = v.isMedium && isClusterOpen;
+  const cls = hide ? 'invisible pointer-events-none' : '';
+  const onFieldChange = (f: keyof FilterInput, vl: string) => setValues((p) => ({ ...p, [f]: vl }));
+  const formProps = {
+    values,
+    errors,
+    onChange: onFieldChange,
+    onSubmit,
+    disabled: status === 'loading',
+  };
+  const toggle = () => {
+    onCloseClusterPanel?.();
+    setIsDrawerOpen((p) => !p);
+  };
   return (
     <>
-      <HamburgerBtn show={v.isNarrow || (v.isMedium && isClusterOpen)} onToggle={toggle} />
-      <FilterSidebar cls={b} status={status} errorMessage={errorMessage} fp={fp} />
+      <HamburgerBtn show={v.isNarrow || hide} onToggle={toggle} />
+      <FilterSidebar cls={cls} status={status} errorMessage={errorMessage} fp={formProps} />
       {isDrawerOpen && (
-        <FilterDrawer status={status} errorMessage={errorMessage} fp={fp} onClose={close} />
+        <FilterDrawer
+          status={status}
+          errorMessage={errorMessage}
+          fp={formProps}
+          onClose={closeDrawer}
+        />
       )}
     </>
   );
