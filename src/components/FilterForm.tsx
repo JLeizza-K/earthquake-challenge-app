@@ -19,20 +19,6 @@ interface MagnitudeFieldProps {
   disabled: boolean;
 }
 
-interface DateFieldsProps {
-  values: FilterInput;
-  errors: FilterErrors;
-  onChange: ChangeHandler;
-  disabled: boolean;
-}
-
-interface FormFieldsProps {
-  values: FilterInput;
-  errors: FilterErrors;
-  onChange: ChangeHandler;
-  disabled: boolean;
-}
-
 interface FilterFormProps {
   values: FilterInput;
   errors: FilterErrors;
@@ -82,38 +68,8 @@ function MagnitudeField({ value, error, onChange, disabled }: MagnitudeFieldProp
   );
 }
 
-function DateFields({ values, errors, onChange, disabled }: DateFieldsProps) {
-  return (
-    <>
-      <DateField
-        label="Start date"
-        name="starttime"
-        value={values.starttime}
-        error={errors.starttime}
-        onChange={onChange}
-        disabled={disabled}
-      />
-      <DateField
-        label="End date"
-        name="endtime"
-        value={values.endtime}
-        error={errors.endtime}
-        onChange={onChange}
-        disabled={disabled}
-      />
-    </>
-  );
-}
-
-function FormFields({ values, errors, onChange, disabled }: FormFieldsProps) {
-  const shared = { onChange, disabled };
-  return (
-    <>
-      <DateFields values={values} errors={errors} {...shared} />
-      <MagnitudeField value={values.minMagnitude} error={errors.minMagnitude} {...shared} />
-    </>
-  );
-}
+const BTN_CLS =
+  'w-full p-2 bg-[#2c3e50] text-white border-0 rounded text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 
 export default function FilterForm({
   values,
@@ -122,18 +78,19 @@ export default function FilterForm({
   onSubmit,
   disabled,
 }: FilterFormProps) {
+  // prettier-ignore
+  const date = (l: string, n: keyof FilterInput) => ({ label: l, name: n, value: values[n], error: errors[n], onChange, disabled });
+  const magn = { value: values.minMagnitude, error: errors.minMagnitude, onChange, disabled };
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     onSubmit(values);
   }
   return (
     <form onSubmit={handleSubmit}>
-      <FormFields values={values} errors={errors} onChange={onChange} disabled={disabled} />
-      <button
-        type="submit"
-        disabled={disabled}
-        className="w-full p-2 bg-[#2c3e50] text-white border-0 rounded text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <DateField {...date('Start date', 'starttime')} />
+      <DateField {...date('End date', 'endtime')} />
+      <MagnitudeField {...magn} />
+      <button type="submit" disabled={disabled} className={BTN_CLS}>
         Search
       </button>
     </form>

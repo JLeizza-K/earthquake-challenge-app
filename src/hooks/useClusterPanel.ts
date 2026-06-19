@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react';
+import { createContext, useState, useRef } from 'react';
 import type { GeoJSONSource } from 'maplibre-gl';
 import { mapLeavesToEarthquakes } from '../lib/clusterLeaves.js';
 import type { Earthquake } from '../types/index.js';
+
+export const ClusterPanelOpenContext = createContext(false);
 
 export function useClusterPanel() {
   const [panelLeaves, setPanelLeaves] = useState<Earthquake[] | null>(null);

@@ -69,7 +69,7 @@ export function handleCardClick(
   onClosePanel: () => void,
   eq: Earthquake,
 ): void {
-  onClosePanel();
+  if (window.innerWidth < 1024) onClosePanel();
   const lngLat: [number, number] = [eq.coordinates[0], eq.coordinates[1]];
   openAtCoords(map, popupRef, lngLat, { mag: eq.mag, place: eq.place, time: eq.time });
 }

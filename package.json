@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "docker:up": "docker build -t earthquake-app . && docker run -d -p 8080:80 --name earthquake-app earthquake-app",
+    "docker:up": "docker build --no-cache -t earthquake-app . && docker run -d -p 8080:80 --name earthquake-app earthquake-app",
     "docker:stop": "docker stop earthquake-app && docker rm earthquake-app",
     "docker:logs": "docker logs -f earthquake-app"
   },

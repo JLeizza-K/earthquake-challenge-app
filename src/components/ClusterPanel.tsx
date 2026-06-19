@@ -34,7 +34,7 @@ interface ClusterPanelProps {
 export default function ClusterPanel({ leaves, onClose, onCardClick }: ClusterPanelProps) {
   if (leaves === null) return null;
   return (
-    <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-lg flex flex-col z-10">
+    <div className="fixed inset-0 z-20 bg-white shadow-lg flex flex-col lg:absolute lg:inset-auto lg:right-0 lg:top-0 lg:h-full lg:w-80 lg:z-10">
       <div className="flex items-center justify-between p-3 border-b border-gray-200">
         <span className="font-semibold text-sm">{leaves.length} earthquakes</span>
         <button
