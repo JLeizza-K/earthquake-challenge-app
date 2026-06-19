@@ -213,8 +213,7 @@ Visible on narrow (always) and on medium only when the filter body is hidden (cl
 | Cluster panel close (filter auto-hid) on medium      | Filter reappears (same state)                    |
 | Cluster panel close (filter drawer closed) on narrow | No change (filter stays hidden)                  |
 | Cluster panel close (filter drawer open) on narrow   | Filter drawer stays open                         |
-
----
+| Search status reaches success/empty/error on narrow  | Drawer closes; user sees results on map          |
 
 ## N — Norms
 

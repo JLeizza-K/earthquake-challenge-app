@@ -1,20 +1,30 @@
 import MapView from './components/MapView.jsx';
 import FilterPanel from './components/FilterPanel.jsx';
 import { useEarthquakeQuery } from './hooks/useEarthquakeQuery.js';
+import { useClusterPanel, ClusterPanelOpenContext } from './hooks/useClusterPanel.js';
 
 export default function App() {
-  const { status, earthquakes, criteria, errors, errorMessage, submit } = useEarthquakeQuery();
-
+  const q = useEarthquakeQuery(),
+    u = useClusterPanel();
+  const isClusterOpen = u.panelLeaves !== null,
+    onClose = () => u.resetPanel();
   return (
-    <div className="relative w-full h-screen">
+    <ClusterPanelOpenContext.Provider value={isClusterOpen}>
       <FilterPanel
-        status={status}
-        criteria={criteria}
-        errors={errors}
-        errorMessage={errorMessage}
-        onSubmit={submit}
+        status={q.status}
+        criteria={q.criteria}
+        errors={q.errors}
+        errorMessage={q.errorMessage}
+        onSubmit={q.submit}
+        onCloseClusterPanel={onClose}
       />
-      <MapView earthquakes={earthquakes} />
-    </div>
+      <MapView
+        earthquakes={q.earthquakes}
+        panelLeaves={u.panelLeaves}
+        loadClusterLeaves={u.loadClusterLeaves}
+        onClosePanel={onClose}
+        resetPanel={u.resetPanel}
+      />
+    </ClusterPanelOpenContext.Provider>
   );
 }

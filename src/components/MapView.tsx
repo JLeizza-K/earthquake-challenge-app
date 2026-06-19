@@ -15,12 +15,15 @@ import {
   buildClusterProperties,
 } from '../lib/mapExpressions.js';
 import { closePopup, handleClick, handleCardClick } from '../lib/mapClickHandlers.js';
-import { useClusterPanel } from '../hooks/useClusterPanel.js';
 import ClusterPanel from './ClusterPanel.js';
 import type { Earthquake } from '../types/index.js';
 
 interface MapViewProps {
   earthquakes: Earthquake[];
+  panelLeaves: Earthquake[] | null;
+  loadClusterLeaves: (src: GeoJSONSource, clusterId: number) => void;
+  onClosePanel: () => void;
+  resetPanel: () => void;
 }
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -104,13 +107,13 @@ function applyEarthquakes(map: MapLibreMap | null, earthquakes: Earthquake[]): v
 
 function applyDataChange(
   earthquakesRef: { current: Earthquake[] },
-  resetPanel: () => void,
+  resetPanelRef: { current: () => void },
   popupRef: { current: Popup | null },
   mapRef: { current: MapLibreMap | null },
   earthquakes: Earthquake[],
 ): void {
   earthquakesRef.current = earthquakes;
-  resetPanel();
+  resetPanelRef.current();
   closePopup(popupRef);
   applyEarthquakes(mapRef.current, earthquakes);
 }
@@ -135,14 +138,13 @@ function useInitMap(
 ) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const loadClusterLeavesRef = useRef(loadClusterLeaves);
-
   useEffect(() => {
     loadClusterLeavesRef.current = loadClusterLeaves;
   }, [loadClusterLeaves]);
-
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
-    const map = new maplibregl.Map({ container: containerRef.current, style: STYLE_URL });
+    const opts = { container: containerRef.current, style: STYLE_URL, renderWorldCopies: false };
+    const map = new maplibregl.Map(opts);
     mapRef.current = map;
     map.on('load', () => initMap(map, earthquakesRef, popupRef, loadClusterLeavesRef.current));
     return () => {
@@ -151,30 +153,28 @@ function useInitMap(
       popupRef.current = null;
     };
   }, [containerRef, earthquakesRef, popupRef]);
-
   return mapRef;
 }
 
-export default function MapView({ earthquakes }: MapViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const earthquakesRef = useRef<Earthquake[]>(earthquakes);
-  const popupRef = useRef<Popup | null>(null);
-  const { panelLeaves, setPanelLeaves, loadClusterLeaves, resetPanel } = useClusterPanel();
+export default function MapView(props: MapViewProps) {
+  const { earthquakes, panelLeaves, loadClusterLeaves, onClosePanel, resetPanel } = props;
+  const containerRef = useRef<HTMLDivElement>(null),
+    earthquakesRef = useRef<Earthquake[]>(earthquakes);
+  const popupRef = useRef<Popup | null>(null),
+    resetPanelRef = useRef(resetPanel);
   const mapRef = useInitMap(containerRef, earthquakesRef, popupRef, loadClusterLeaves);
-
   useEffect(() => {
-    applyDataChange(earthquakesRef, resetPanel, popupRef, mapRef, earthquakes);
+    applyDataChange(earthquakesRef, resetPanelRef, popupRef, mapRef, earthquakes);
   }, [earthquakes, mapRef]);
-
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <ClusterPanel
         leaves={panelLeaves}
-        onClose={() => setPanelLeaves(null)}
+        onClose={onClosePanel}
         onCardClick={(eq) => {
           if (!mapRef.current) return;
-          handleCardClick(mapRef.current, popupRef, () => setPanelLeaves(null), eq);
+          handleCardClick(mapRef.current, popupRef, onClosePanel, eq);
         }}
       />
     </div>
