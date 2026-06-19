@@ -33,49 +33,49 @@ function toValues(criteria: FilterCriteria): FilterInput {
   };
 }
 
+function applyToggle(
+  onClose: (() => void) | undefined,
+  set: React.Dispatch<React.SetStateAction<boolean>>,
+): void {
+  onClose?.();
+  set((prev) => !prev);
+}
+
 function useFilterPanelState(
   criteria: FilterCriteria | null,
   status: FetchStatus,
   isClusterOpen: boolean,
+  errors: FilterErrors,
+  onSubmit: (raw: FilterInput) => void,
 ) {
   const [values, setValues] = useState<FilterInput>(EMPTY_VALUES);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- populate form from submitted criteria; no cascade risk
     if (criteria) setValues(toValues(criteria));
   }, [criteria]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close drawer when cluster opens; no cascade risk
     if (isClusterOpen) setIsDrawerOpen(false);
   }, [isClusterOpen]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close drawer after fetch completes; no cascade risk
     if (isTerminal(status)) setIsDrawerOpen(false);
   }, [status]);
-  return { values, setValues, isDrawerOpen, setIsDrawerOpen };
+  const onChange = (f: keyof FilterInput, vl: string) => setValues((p) => ({ ...p, [f]: vl }));
+  const formProps = { values, errors, onChange, onSubmit, disabled: status === 'loading' };
+  return { isDrawerOpen, setIsDrawerOpen, closeDrawer: () => setIsDrawerOpen(false), formProps };
 }
 
 export default function FilterPanel(props: FilterPanelProps) {
   const { status, criteria, errors, errorMessage, onSubmit, onCloseClusterPanel } = props;
   const isClusterOpen = useContext(ClusterPanelOpenContext);
-  const { values, setValues, isDrawerOpen, setIsDrawerOpen } = useFilterPanelState(
-    criteria,
-    status,
-    isClusterOpen,
-  );
-  const closeDrawer = () => setIsDrawerOpen(false);
+  const state = useFilterPanelState(criteria, status, isClusterOpen, errors, onSubmit);
+  const { isDrawerOpen, setIsDrawerOpen, closeDrawer, formProps } = state;
   const v = getViewport();
   const hide = v.isMedium && isClusterOpen;
   const cls = hide ? 'invisible pointer-events-none' : '';
-  const onFieldChange = (f: keyof FilterInput, vl: string) => setValues((p) => ({ ...p, [f]: vl }));
-  const formProps = {
-    values,
-    errors,
-    onChange: onFieldChange,
-    onSubmit,
-    disabled: status === 'loading',
-  };
-  const toggle = () => {
-    onCloseClusterPanel?.();
-    setIsDrawerOpen((p) => !p);
-  };
+  const toggle = () => applyToggle(onCloseClusterPanel, setIsDrawerOpen);
   return (
     <>
       <HamburgerBtn show={v.isNarrow || hide} onToggle={toggle} />
