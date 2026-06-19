@@ -16,8 +16,10 @@ const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   hour12: false,
 };
 
+const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, TIME_FORMAT_OPTIONS);
+
 export function formatEarthquakeTime(timeMs: number): string {
-  return new Intl.DateTimeFormat(undefined, TIME_FORMAT_OPTIONS).format(new Date(timeMs));
+  return TIME_FORMATTER.format(new Date(timeMs));
 }
 
 function buildRow(label: string, value: string): HTMLParagraphElement {
